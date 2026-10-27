@@ -92,8 +92,8 @@ public class Api {
         CookieHandler.setDefault(cookies);
         load();
         syncCookies(true);
-        webvpn = st.optBoolean("webvpn_mode", false);
-        webvpnBase = str(st, "webvpn_base");
+        webvpn = false; // 每个进程先尝试直连，避免带着上次的“校外模式”在校园网里绕 WebVPN
+        webvpnBase = "";
     }
 
     // ---------------------------------------------------------------- state
@@ -762,9 +762,8 @@ public class Api {
 
     private boolean ensureJwxtOnce() {
         if (ticket().isEmpty()) return false;
-        if (probeJwxtSession()) { jwxtOk = true; return true; }
-
         if (webvpn) {
+            if (probeJwxtSession()) { jwxtOk = true; return true; }
             for (int i = 0; i < 2 && !jwxtOk; i++) {
                 if (webvpnLogin()) jwxtOk = webvpnSso();
             }
@@ -777,6 +776,7 @@ public class Api {
         }
 
         if (directReachable()) {
+            if (probeJwxtSession()) { jwxtOk = true; return true; }
             for (int i = 0; i < 2 && !jwxtOk; i++) {
                 jwxtOk = "ok".equals(jwxtSso().optString("status"));
             }
@@ -1644,6 +1644,10 @@ public class Api {
     }
 
     // ---------------------------------------------------------------- 汇总
+    static long remainMs(long deadline) {
+        return Math.max(1, deadline - System.currentTimeMillis());
+    }
+
     public JSONObject overview(boolean probe) {
         long t0 = System.currentTimeMillis();
         invalidateJwxtCache();
@@ -1695,13 +1699,14 @@ public class Api {
 
                 long tp = System.currentTimeMillis();
                 final String termFinal = term;
+                final long deadline = System.currentTimeMillis() + 15000;
                 Future<?> ttF = pool.submit(() -> jwTimetable(termFinal));
                 Future<JSONArray> examF = pool.submit(() -> jwExams());
                 Future<JSONObject> gradeF = pool.submit(() -> jwGrades());
-                try { ttF.get(30, TimeUnit.SECONDS); } catch (Exception ignored) {}
-                try { examItems = examF.get(30, TimeUnit.SECONDS); } catch (Exception ignored) { examItems = new JSONArray(); }
+                try { ttF.get(remainMs(deadline), TimeUnit.MILLISECONDS); } catch (Exception ignored) {}
+                try { examItems = examF.get(remainMs(deadline), TimeUnit.MILLISECONDS); } catch (Exception ignored) { examItems = new JSONArray(); }
                 try {
-                    JSONObject g = gradeF.get(30, TimeUnit.SECONDS);
+                    JSONObject g = gradeF.get(remainMs(deadline), TimeUnit.MILLISECONDS);
                     if (g.optJSONArray("items") != null) gradeItems = g.optJSONArray("items");
                     if (g.optJSONObject("rank") != null) rank = g.optJSONObject("rank");
                 } catch (Exception ignored) {}
