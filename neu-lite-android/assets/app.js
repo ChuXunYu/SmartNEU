@@ -95,7 +95,7 @@ async function nativeApi(path, opts = {}) {
     case "/api/net": return nativeCallAsync("net");
     case "/api/ipgw": return nativeCallAsync("ipgw");
     case "/api/jwxt": return nativeCallAsync("jwxt", { probe: params.get("probe") === "1" });
-    case "/api/login": return nativeCallAsync("login", body);
+    case "/api/login": return nativeCallAsync(body.quick ? "quickLogin" : "login", body);
     case "/api/sms": return nativeCallAsync("sms", body);
     case "/api/logout": return nativeCallAsync("logout");
     default: throw new Error("unsupported: " + p);
@@ -232,7 +232,7 @@ async function boot() {
   const logged = !!state.session.logged_in;
   $("#loginView").classList.toggle("hidden", logged);
   $("#appView").classList.toggle("hidden", !logged);
-  if (!logged) return;
+  if (!logged) { renderLoginMode(state.session); return; }
   if (state.session.demo) toast("演示模式：示例数据");
 
   const cache = loadCache();
@@ -762,6 +762,58 @@ function ssoHref(url) {
 }
 
 /* ---------------- 登录 ---------------- */
+function maskUsername(value) {
+  const s = String(value || "");
+  if (s.length <= 6) return s;
+  return s.slice(0, 4) + "****" + s.slice(-2);
+}
+
+function renderLoginMode(session) {
+  const saved = session && session.saved_user;
+  $("#smsBox").classList.add("hidden");
+  $("#loginMsg").textContent = "";
+  $("#savedLogin").classList.toggle("hidden", !saved);
+  $("#manualLogin").classList.toggle("hidden", !!saved);
+  $("#loginHint").textContent = saved
+    ? "账号密码只保存在本机，不会上传；换设备请导入 state"
+    : "登录一次后，导出 state.json 带到新设备可免二次验证";
+  if (!saved) return;
+  $("#username").value = saved;
+  $("#savedName").textContent = (session.saved_name || "已保存账号").trim();
+  $("#savedId").textContent = "学号 " + maskUsername(session.saved_xgh || saved);
+}
+
+$("#btnSwitchAccount").addEventListener("click", () => {
+  $("#savedLogin").classList.add("hidden");
+  $("#manualLogin").classList.remove("hidden");
+  $("#password").value = "";
+  $("#password").focus();
+});
+
+$("#btnQuickLogin").addEventListener("click", async () => {
+  const btn = $("#btnQuickLogin");
+  btn.disabled = true;
+  btn.textContent = "正在登录";
+  $("#loginMsg").textContent = "";
+  try {
+    const r = await api("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ quick: true, remember: true }),
+    });
+    if (r.status === "sms") {
+      $("#smsBox").classList.remove("hidden");
+      toast("需要短信验证");
+      return;
+    }
+    clearCache();
+    await boot();
+  } catch (e) {
+    $("#loginMsg").textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "一键登录";
+  }
+});
 $("#togglePwd").addEventListener("click", () => {
   const p = $("#password");
   const show = p.type === "password";

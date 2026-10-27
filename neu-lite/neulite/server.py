@@ -41,11 +41,15 @@ class Ctx:
     # ---- 各功能 ----------------------------------------------------------
     def session_info(self) -> dict:
         profile = mock.overview()["profile"] if self.demo else self.st.profile
+        remember = self.st.remember or {}
         return {
             "logged_in": bool(self.st.ticket) or self.demo,
             "profile": profile,
             "imei": (self.st.imei[:8] + "…") if self.st.imei else "",
-            "remember": bool(self.st.remember),
+            "remember": bool(remember),
+            "saved_user": remember.get("username", ""),
+            "saved_name": remember.get("name", "") or profile.get("name", ""),
+            "saved_xgh": remember.get("xgh", "") or profile.get("xgh", ""),
             "updated_at": self.st.updated_at,
             "demo": self.demo,
         }
@@ -306,8 +310,11 @@ class Handler(BaseHTTPRequestHandler):
                     if self.ctx.demo:
                         return self._json({"status": "ok", "demo": True})
                     try:
-                        r = self.ctx.auth.login(body.get("username", ""), body.get("password", ""),
-                                                remember=bool(body.get("remember")))
+                        if body.get("quick"):
+                            r = self.ctx.auth.quick_login()
+                        else:
+                            r = self.ctx.auth.login(body.get("username", ""), body.get("password", ""),
+                                                    remember=bool(body.get("remember")))
                         return self._json(r)
                     except NeedSms:
                         return self._json({"status": "sms", "note": "需要短信验证码"})

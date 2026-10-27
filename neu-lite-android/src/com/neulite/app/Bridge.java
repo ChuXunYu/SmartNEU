@@ -105,6 +105,17 @@ public class Bridge {
                     }
                     throw e;
                 }
+            case "quickLogin":
+                try {
+                    return api.quickLogin().toString();
+                } catch (Api.ApiException e) {
+                    if (e.code == 3) {
+                        JSONObject o = new JSONObject();
+                        o.put("status", "sms");
+                        return o.toString();
+                    }
+                    throw e;
+                }
             case "sms":
                 if (p.optBoolean("send")) return api.sendSms().toString();
                 return api.verifySms(p.optString("code"), p.optBoolean("trust")).toString();

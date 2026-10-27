@@ -577,6 +577,18 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 .btn-primary{background:var(--ink);color:var(--paper)}
 .login-hint{color:var(--muted);line-height:1.9}
 
+/* 已保存账号：一键登录 */
+.savedlogin{margin-top:4px}
+.saved-tag{font-size:8.5px;letter-spacing:2.4px;color:var(--muted);text-transform:uppercase}
+.saved-user{display:flex;align-items:baseline;gap:10px;padding:16px 0 14px;
+  margin:8px 0 18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line-soft)}
+.saved-user b{font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:1px}
+.saved-user span{font-size:10px;letter-spacing:1px;color:var(--muted)}
+.btn-switch{width:100%;margin-top:10px;border:1px solid var(--line);background:transparent;
+  color:var(--ink-2);padding:12px;font-size:11px;letter-spacing:1.5px;cursor:pointer}
+.btn-switch:active{background:var(--cream)}
+.savedlogin .btn-primary{margin-top:2px}
+
 /* 选择与细节 */
 ::selection{background:var(--red);color:var(--paper)}
 

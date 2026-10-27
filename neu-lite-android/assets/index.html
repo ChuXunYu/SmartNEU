@@ -17,19 +17,31 @@
     <h1>智慧东大</h1>
     <p class="loginsub">NEU · 课程 考试 成绩 网费</p>
 
-    <label class="flabel" for="username">学号</label>
-    <div class="field">
-      <input id="username" autocomplete="username" inputmode="numeric" placeholder="2024xxxx">
+    <div id="savedLogin" class="savedlogin hidden">
+      <div class="saved-tag">本机已保存账号</div>
+      <div class="saved-user">
+        <b id="savedName">已保存账号</b>
+        <span id="savedId"></span>
+      </div>
+      <button id="btnQuickLogin" class="btn-primary">一键登录</button>
+      <button id="btnSwitchAccount" class="btn-switch">使用其他账号</button>
     </div>
 
-    <label class="flabel" for="password">密码</label>
-    <div class="field">
-      <input id="password" type="password" autocomplete="current-password" placeholder="统一身份认证密码">
-      <button id="togglePwd" class="eye" type="button">显示</button>
-    </div>
+    <div id="manualLogin">
+      <label class="flabel" for="username">学号</label>
+      <div class="field">
+        <input id="username" autocomplete="username" inputmode="numeric" placeholder="2024xxxx">
+      </div>
 
-    <label class="check"><input type="checkbox" id="remember" checked> 记住账号密码</label>
-    <button id="btnLogin" class="btn-primary">登 录</button>
+      <label class="flabel" for="password">密码</label>
+      <div class="field">
+        <input id="password" type="password" autocomplete="current-password" placeholder="统一身份认证密码">
+        <button id="togglePwd" class="eye" type="button">显示</button>
+      </div>
+
+      <label class="check"><input type="checkbox" id="remember" checked> 记住账号密码</label>
+      <button id="btnLogin" class="btn-primary">登 录</button>
+    </div>
 
     <div id="smsBox" class="smsbox hidden">
       <p class="warn">需要短信二次验证</p>
@@ -42,7 +54,7 @@
       </div>
     </div>
     <p id="loginMsg" class="msg"></p>
-    <p class="login-hint">登录一次后，导出 state.json 带到新设备可免二次验证</p>
+    <p id="loginHint" class="login-hint">登录一次后，导出 state.json 带到新设备可免二次验证</p>
   </div>
 </div>
 

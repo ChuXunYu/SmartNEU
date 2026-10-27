@@ -259,6 +259,15 @@ public class Api {
         }
     }
 
+    public JSONObject quickLogin() throws Exception {
+        JSONObject rem = st.optJSONObject("remember");
+        if (rem == null) throw new ApiException(-1, "本机没有保存账号密码");
+        String u = str(rem, "username");
+        String p = str(rem, "password");
+        if (u.isEmpty() || p.isEmpty()) throw new ApiException(-1, "本机没有保存账号密码");
+        return login(u, p, true);
+    }
+
     boolean relogin() {
         JSONObject rem = st.optJSONObject("remember");
         if (rem == null) return false;
@@ -290,6 +299,8 @@ public class Api {
                 JSONObject r = new JSONObject();
                 r.put("username", user);
                 r.put("password_removed", true);
+                r.put("name", str(d, "name"));
+                r.put("xgh", str(d, "xgh"));
                 put(st, "remember", r);
             }
             save();
@@ -359,6 +370,15 @@ public class Api {
     }
 
     public void logout() {
+        JSONObject prof = st.optJSONObject("profile");
+        JSONObject rem = st.optJSONObject("remember");
+        if (rem != null && str(rem, "name").isEmpty() && prof != null) {
+            try {
+                rem.put("name", str(prof, "name"));
+                rem.put("xgh", str(prof, "xgh"));
+                put(st, "remember", rem);
+            } catch (Exception ignored) {}
+        }
         try {
             JSONObject p = new JSONObject();
             call(LOGOUT, p);

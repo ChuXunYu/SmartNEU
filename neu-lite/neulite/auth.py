@@ -32,7 +32,9 @@ class Auth:
         if code == "1":
             self._apply_login(d, username)
             if remember:
-                self.st.remember = {"username": username, "password_removed": None}
+                self.st.remember = {"username": username, "password_removed": None,
+                                    "name": self.st.profile.get("name", ""),
+                                    "xgh": self.st.profile.get("xgh", "")}
             state_mod.save(self.st)
             return {"status": "ok", "profile": self.st.profile}
         if code == "3":
@@ -42,6 +44,12 @@ class Auth:
                 return self.verify_sms(sms_code, trust_device)
             raise NeedSms(self.st.temp_token)
         raise ApiError(code or -1, str(res.get("m") or d.get("m") or "登录失败"))
+
+    def quick_login(self) -> dict:
+        cred = self.st.remember or {}
+        if not cred.get("username") or not cred.get("password"):
+            raise ApiError(-1, "本机没有保存账号密码")
+        return self.login(cred["username"], cred["password"], remember=True)
 
     def send_sms(self) -> dict:
         return self.s.post(config.SMS_SEND, {
@@ -101,6 +109,9 @@ class Auth:
 
     # ---- 登出 ------------------------------------------------------------
     def logout(self) -> None:
+        if self.st.remember and not self.st.remember.get("name"):
+            self.st.remember["name"] = self.st.profile.get("name", "")
+            self.st.remember["xgh"] = self.st.profile.get("xgh", "")
         try:
             self.s.post(config.LOGOUT, {})
         except (ApiError, Exception):
