@@ -1858,7 +1858,16 @@ public class Api {
         put(o, "profile", st.optJSONObject("profile"));
         String im = imei();
         put(o, "imei", im.length() > 8 ? im.substring(0, 8) + "…" : im);
-        put(o, "remember", st.optJSONObject("remember") != null);
+        JSONObject rem = st.optJSONObject("remember");
+        JSONObject prof = st.optJSONObject("profile");
+        String savedName = rem == null ? "" : str(rem, "name");
+        String savedXgh = rem == null ? "" : str(rem, "xgh");
+        if (savedName.isEmpty() && prof != null) savedName = str(prof, "name");
+        if (savedXgh.isEmpty() && prof != null) savedXgh = str(prof, "xgh");
+        put(o, "remember", rem != null);
+        put(o, "saved_user", rem == null ? "" : str(rem, "username"));
+        put(o, "saved_name", savedName);
+        put(o, "saved_xgh", savedXgh);
         put(o, "updated_at", str(st, "updated_at"));
         put(o, "demo", false);
         return o;
