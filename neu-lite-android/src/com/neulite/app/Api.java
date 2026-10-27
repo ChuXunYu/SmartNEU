@@ -25,6 +25,10 @@ import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -79,6 +83,8 @@ public class Api {
     private JSONObject ttCache, termCache;
     private long ttAt = 0, termAt = 0;
     private String ttTerm = "";
+    private JSONArray linksCache;
+    private long linksAt = 0;
 
     public Api(Context ctx) {
         sp = ctx.getSharedPreferences("neu", Context.MODE_PRIVATE);
@@ -86,6 +92,8 @@ public class Api {
         CookieHandler.setDefault(cookies);
         load();
         syncCookies(true);
+        webvpn = st.optBoolean("webvpn_mode", false);
+        webvpnBase = str(st, "webvpn_base");
     }
 
     // ---------------------------------------------------------------- state
@@ -299,6 +307,7 @@ public class Api {
     }
 
     private void applyLogin(JSONObject d, String user) throws Exception {
+        invalidateJwxtCache();
         String t = str(d, "login_ticket");
         if (t.isEmpty()) t = str(d, "login_result");
         put(st, "ticket", t);
@@ -369,10 +378,13 @@ public class Api {
     }
 
     public JSONArray deepLinks() {
+        if (linksCache != null && System.currentTimeMillis() - linksAt < 600000) return linksCache;
         JSONArray out = new JSONArray();
         try {
             walkLinks(layout(), out, 0);
         } catch (Exception ignored) {}
+        linksCache = out;
+        linksAt = System.currentTimeMillis();
         return out;
     }
 
@@ -750,18 +762,34 @@ public class Api {
 
     private boolean ensureJwxtOnce() {
         if (ticket().isEmpty()) return false;
-        if (!webvpn) {
-            if (directReachable()) {
-                for (int i = 0; i < 2 && !jwxtOk; i++) {
-                    jwxtOk = "ok".equals(jwxtSso().optString("status"));
-                }
-                if (jwxtOk) return true;
+        if (probeJwxtSession()) { jwxtOk = true; return true; }
+
+        if (webvpn) {
+            for (int i = 0; i < 2 && !jwxtOk; i++) {
+                if (webvpnLogin()) jwxtOk = webvpnSso();
             }
-            webvpn = true;
+            if (jwxtOk) return true;
+            webvpn = false;
+            webvpnBase = "";
+            webvpnAuthed = false;
+            put(st, "webvpn_mode", false);
+            save();
         }
+
+        if (directReachable()) {
+            for (int i = 0; i < 2 && !jwxtOk; i++) {
+                jwxtOk = "ok".equals(jwxtSso().optString("status"));
+            }
+            if (jwxtOk) {
+                put(st, "webvpn_mode", false);
+                save();
+                return true;
+            }
+        }
+
+        webvpn = true;
         for (int i = 0; i < 2 && !jwxtOk; i++) {
-            if (!webvpnLogin()) continue;
-            jwxtOk = webvpnSso();
+            if (webvpnLogin()) jwxtOk = webvpnSso();
         }
         return jwxtOk;
     }
@@ -770,8 +798,8 @@ public class Api {
     boolean directReachable() {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL(JWXT_HOME).openConnection();
-            c.setConnectTimeout(4000);
-            c.setReadTimeout(4000);
+            c.setConnectTimeout(1200);
+            c.setReadTimeout(1200);
             c.setRequestProperty("User-Agent", UA);
             int code = c.getResponseCode();
             readAll(c);
@@ -983,6 +1011,33 @@ public class Api {
         return null;
     }
 
+    boolean probeJwxtSession() {
+        try {
+            if (ticket().isEmpty()) return false;
+            String base = webvpn ? webvpnBase : JWXT;
+            if (base == null || base.isEmpty()) return false;
+            String url = base + "/jwapp/sys/homeapp/api/home/currentUser.do";
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setConnectTimeout(2500);
+            c.setReadTimeout(4000);
+            c.setRequestProperty("User-Agent", UA);
+            c.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            c.setRequestProperty("Referer", base + "/jwapp/sys/homeapp/home/index.html");
+            String ck = cookieHeaderFor(new URL(url));
+            if (!ck.isEmpty()) c.setRequestProperty("Cookie", ck);
+            try (OutputStream os = c.getOutputStream()) { os.write(new byte[0]); }
+            String text = readAll(c).trim();
+            if (!text.startsWith("{")) return false;
+            JSONObject obj = new JSONObject(text);
+            return "0".equals(str(obj, "code")) || "200".equals(str(obj, "code"));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     boolean webvpnSso() {
         try {
             String token = webvpnToken("jwxt.neu.edu.cn");
@@ -992,6 +1047,9 @@ public class Api {
             httpGetFollow(base + "/jwapp/sys/homeapp/index.do?ticket=" + URLEncoder.encode(t, "UTF-8"), 10);
             httpGetFollow(base + "/jwapp/sys/homeapp/home/index.html", 6);
             webvpnBase = base;
+            st.put("webvpn_mode", true);
+            st.put("webvpn_base", base);
+            save();
             return true;
         } catch (Exception e) {
             return false;
@@ -1579,6 +1637,7 @@ public class Api {
     public void importJson(String json) throws Exception {
         JSONObject obj = new JSONObject(json);
         st = obj;
+        invalidateJwxtCache();
         if (str(st, "imei").isEmpty()) st.put("imei", UUID.randomUUID().toString());
         save();
         syncCookies(true);
@@ -1586,18 +1645,19 @@ public class Api {
 
     // ---------------------------------------------------------------- 汇总
     public JSONObject overview(boolean probe) {
+        long t0 = System.currentTimeMillis();
         invalidateJwxtCache();
         JSONObject out = new JSONObject();
         put(out, "profile", st.optJSONObject("profile"));
         put(out, "session", sessionInfo());
-        try {
-            put(out, "schedule", schedule(null));
-        } catch (Exception e) {
-            JSONObject s = new JSONObject();
-            put(s, "error", e.getMessage());
-            put(out, "schedule", s);
-        }
+
+        long tc = System.currentTimeMillis();
         JSONArray all = cards();
+        long tCards = System.currentTimeMillis() - tc;
+        long td = System.currentTimeMillis();
+        JSONArray deep = deepLinks();
+        long tDeep = System.currentTimeMillis() - td;
+
         JSONArray net = new JSONArray(), examCards = new JSONArray(), gradeCards = new JSONArray();
         for (int i = 0; i < all.length(); i++) {
             JSONObject c = all.optJSONObject(i);
@@ -1607,7 +1667,7 @@ public class Api {
             if (containsAny(name, EXAM_KEYS)) examCards.put(c);
             if (containsAny(name, GRADE_KEYS)) gradeCards.put(c);
         }
-        JSONArray netLinks = filterLinks(deepLinks(), NET_KEYS);
+        JSONArray netLinks = filterLinks(deep, NET_KEYS);
         JSONObject netObj = new JSONObject();
         put(netObj, "status", net.length() > 0 ? "ok" : (netLinks.length() > 0 ? "partial" : "unavailable"));
         put(netObj, "cards", net);
@@ -1615,26 +1675,60 @@ public class Api {
         put(netObj, "note", net.length() > 0 ? "" : "门户未返回网费卡片，可从链接进入自助服务");
         put(out, "net", netObj);
 
-        JSONObject jw = new JSONObject();
-        JSONArray examItems = new JSONArray();
-        JSONArray gradeItems = new JSONArray();
+        JSONObject scheduleObj = null;
+        boolean jwOk = false;
+        JSONArray examItems = new JSONArray(), gradeItems = new JSONArray();
         JSONObject rank = new JSONObject();
+        JSONObject jw = new JSONObject();
+        long tEnsure = 0, tTerm = 0, tParallel = 0, tSchedule = 0;
+        ExecutorService pool = Executors.newFixedThreadPool(3);
         try {
-            if (ensureJwxt()) {
-                examItems = jwExams();
-                JSONObject g = jwGrades();
-                if (g.optJSONArray("items") != null) gradeItems = g.optJSONArray("items");
-                if (g.optJSONObject("rank") != null) rank = g.optJSONObject("rank");
+            long te = System.currentTimeMillis();
+            try { jwOk = ensureJwxt(); } catch (Exception e) { jwOk = false; }
+            tEnsure = System.currentTimeMillis() - te;
+
+            if (jwOk) {
+                String term = "";
+                long tt = System.currentTimeMillis();
+                try { term = str(currentTerm(), "term"); } catch (Exception ignored) {}
+                tTerm = System.currentTimeMillis() - tt;
+
+                long tp = System.currentTimeMillis();
+                final String termFinal = term;
+                Future<?> ttF = pool.submit(() -> jwTimetable(termFinal));
+                Future<JSONArray> examF = pool.submit(() -> jwExams());
+                Future<JSONObject> gradeF = pool.submit(() -> jwGrades());
+                try { ttF.get(30, TimeUnit.SECONDS); } catch (Exception ignored) {}
+                try { examItems = examF.get(30, TimeUnit.SECONDS); } catch (Exception ignored) { examItems = new JSONArray(); }
+                try {
+                    JSONObject g = gradeF.get(30, TimeUnit.SECONDS);
+                    if (g.optJSONArray("items") != null) gradeItems = g.optJSONArray("items");
+                    if (g.optJSONObject("rank") != null) rank = g.optJSONObject("rank");
+                } catch (Exception ignored) {}
+                tParallel = System.currentTimeMillis() - tp;
+
+                long ts = System.currentTimeMillis();
+                try { scheduleObj = schedule(null); } catch (Exception ignored) {}
+                tSchedule = System.currentTimeMillis() - ts;
                 put(jw, "status", "ok");
             } else {
                 put(jw, "status", "need_login");
                 put(jw, "note", "教务未登录（需校园网/WebVPN）");
             }
-        } catch (Exception e) {
-            put(jw, "status", "error");
-            put(jw, "note", e.getMessage());
+        } finally {
+            pool.shutdownNow();
         }
-        JSONArray deep = deepLinks();
+
+        if (scheduleObj == null) {
+            try { scheduleObj = schedule(null); }
+            catch (Exception e) {
+                JSONObject s = new JSONObject();
+                put(s, "error", e.getMessage());
+                scheduleObj = s;
+            }
+        }
+        put(out, "schedule", scheduleObj);
+
         JSONObject exams = new JSONObject();
         put(exams, "status", jw.optString("status", "need_login"));
         put(exams, "note", str(jw, "note"));
@@ -1642,6 +1736,7 @@ public class Api {
         put(exams, "cards", examCards);
         put(exams, "links", filterLinks(deep, EXAM_KEYS));
         put(out, "exams", exams);
+
         JSONObject grades = new JSONObject();
         put(grades, "status", jw.optString("status", "need_login"));
         put(grades, "note", str(jw, "note"));
@@ -1650,6 +1745,20 @@ public class Api {
         put(grades, "links", filterLinks(deep, GRADE_KEYS));
         put(grades, "rank", rank);
         put(out, "grades", grades);
+
+        JSONObject timings = new JSONObject();
+        put(timings, "cards", tCards);
+        put(timings, "links", tDeep);
+        put(timings, "ensure", tEnsure);
+        put(timings, "term", tTerm);
+        put(timings, "parallel", tParallel);
+        put(timings, "schedule", tSchedule);
+        long total = System.currentTimeMillis() - t0;
+        put(timings, "total", total);
+        put(out, "timings", timings);
+        android.util.Log.d("NeuTime", "overview cards=" + tCards + " links=" + tDeep
+                + " ensure=" + tEnsure + " term=" + tTerm + " parallel=" + tParallel
+                + " schedule=" + tSchedule + " total=" + total + " jw=" + jwOk);
         return out;
     }
 
@@ -1695,5 +1804,8 @@ public class Api {
         return "";
     }
 }
+
+
+
 
 

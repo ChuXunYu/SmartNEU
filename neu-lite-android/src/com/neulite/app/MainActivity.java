@@ -11,6 +11,7 @@ import android.provider.MediaStore;
 import android.content.res.Configuration;
 import android.view.View;
 import android.webkit.WebSettings;
+import android.webkit.WebViewClient;
 import android.webkit.WebView;
 import android.widget.Toast;
 
@@ -53,7 +54,21 @@ public class MainActivity extends Activity {
         web.setBackgroundColor(paper);
         web.addJavascriptInterface(new Bridge(this, api), "NEU");
         setContentView(web);
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (getIntent() != null && getIntent().getBooleanExtra("run_refresh", false)) {
+                    view.postDelayed(() -> view.evaluateJavascript(
+                            "window.refresh&&window.refresh()", null), 1200);
+                }
+            }
+        });
         web.loadUrl("file:///android_asset/index.html");
+        if (getIntent() != null && getIntent().getBooleanExtra("run_refresh", false)) {
+            web.postDelayed(() -> web.evaluateJavascript(
+                    "window.refresh&&window.refresh()", null), 2500);
+        }
     }
 
     @Override
