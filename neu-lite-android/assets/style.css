@@ -138,6 +138,11 @@ h1#greet{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:
   font-size:11px;letter-spacing:1.5px;pointer-events:none;
   box-shadow:4px 4px 0 var(--line-soft);animation:chipin .2s ease both}
 @keyframes chipin{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+.updatechip #updateText::after{content:"";animation:dots 1.2s steps(4,end) infinite}
+.updatechip.done #updateText::after{content:"";animation:none}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+body.updating .panel{transition:opacity .18s ease}
+body.updating .panel{opacity:.92}
 .updatechip .spin{width:12px;height:12px;border:1.5px solid var(--line);border-top-color:var(--red);border-radius:50%;
   animation:rot .7s linear infinite}
 .updatechip.done{border-color:var(--red);color:var(--red)}

@@ -47,20 +47,46 @@ function nativeCall(action, payload) {
   if (j.error) { const e = new Error(j.error); e.code = j.code; throw e; }
   return j;
 }
+
+const neuPending = new Map();
+let neuSeq = 0;
+window.__neuAsync = function (id, raw) {
+  const p = neuPending.get(id);
+  if (!p) return;
+  neuPending.delete(id);
+  try {
+    const j = JSON.parse(raw || "{}");
+    if (j.error) { const e = new Error(j.error); e.code = j.code; p.reject(e); }
+    else p.resolve(j);
+  } catch (e) { p.reject(e); }
+};
+function nativeCallAsync(action, payload) {
+  if (!window.NEU.callAsync) return Promise.resolve(nativeCall(action, payload));
+  return new Promise((resolve, reject) => {
+    const id = "r" + (++neuSeq);
+    neuPending.set(id, { resolve, reject });
+    try {
+      window.NEU.callAsync(action, JSON.stringify(payload || {}), id);
+    } catch (e) {
+      neuPending.delete(id);
+      reject(e);
+    }
+  });
+}
 async function nativeApi(path, opts = {}) {
   const [p, qs] = path.split("?");
   const params = new URLSearchParams(qs || "");
   const body = opts.body ? JSON.parse(opts.body) : {};
   switch (p) {
     case "/api/session": return nativeCall("session");
-    case "/api/overview": return nativeCall("overview", { probe: params.get("probe") === "1" });
-    case "/api/schedule": return nativeCall("schedule", { start: params.get("start") || "" });
-    case "/api/net": return nativeCall("net");
-    case "/api/ipgw": return nativeCall("ipgw");
-    case "/api/jwxt": return nativeCall("jwxt", { probe: params.get("probe") === "1" });
-    case "/api/login": return nativeCall("login", body);
-    case "/api/sms": return nativeCall("sms", body);
-    case "/api/logout": return nativeCall("logout");
+    case "/api/overview": return nativeCallAsync("overview", { probe: params.get("probe") === "1" });
+    case "/api/schedule": return nativeCallAsync("schedule", { start: params.get("start") || "" });
+    case "/api/net": return nativeCallAsync("net");
+    case "/api/ipgw": return nativeCallAsync("ipgw");
+    case "/api/jwxt": return nativeCallAsync("jwxt", { probe: params.get("probe") === "1" });
+    case "/api/login": return nativeCallAsync("login", body);
+    case "/api/sms": return nativeCallAsync("sms", body);
+    case "/api/logout": return nativeCallAsync("logout");
     default: throw new Error("unsupported: " + p);
   }
 }
@@ -103,15 +129,17 @@ function renderAll(d) {
 let refreshStartedAt = 0;
 function startRefresh() {
   refreshStartedAt = performance.now();
+  document.body.classList.add("updating");
   $("#progress").classList.remove("hidden");
   const chip = $("#updateChip");
   chip.classList.remove("hidden", "done");
-  $("#updateText").textContent = "正在更新…";
+  $("#updateText").textContent = "正在更新";
 }
 function finishRefresh(ok) {
   // 至少让“更新中”停留 600ms，避免一闪而过
   const delay = Math.max(0, 600 - (performance.now() - refreshStartedAt));
   setTimeout(() => {
+    document.body.classList.remove("updating");
     $("#progress").classList.add("hidden");
     const chip = $("#updateChip");
     if (!ok) { chip.classList.add("hidden"); return; }
