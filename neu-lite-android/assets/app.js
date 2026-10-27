@@ -369,9 +369,10 @@ function renderSchedule(schedule) {
     renderSchedule(state.schedule);
   }));
   if (state.view === "week") {
-    $("#dayTitle").textContent = "整周课程";
+    $("#dayTitle").parentElement.classList.add("hidden");
     renderWeek(days);
   } else {
+    $("#dayTitle").parentElement.classList.remove("hidden");
     renderTimeline(days[state.selectedDay]);
   }
 }
@@ -611,9 +612,13 @@ function renderGrades(grades) {
     const num = parseFloat(s);
     let cls = "txt";
     if (!isNaN(num)) cls = num >= 90 ? "s90" : num >= 80 ? "s80" : num >= 60 ? "s60" : "s0";
+    const meta = [x.term, x.type, x.credit ? `${x.credit} 学分` : ""]
+      .filter(Boolean).map(esc).join(" · ");
+    const pct = !isNaN(num) ? Math.max(0, Math.min(100, num)) : null;
     return `<div class="grade">
-      <div class="g-name"><b>${esc(x.course)}</b><span>${esc(x.term || "")}${x.type ? " · " + esc(x.type) : ""}</span></div>
+      <div class="g-name"><b>${esc(x.course)}</b><span>${meta}</span></div>
       <div class="score ${cls}">${esc(s || "—")}</div>
+      ${pct != null ? `<div class="g-bar"><i style="width:${pct}%"></i></div>` : ""}
     </div>`;
   }).join("");
 }

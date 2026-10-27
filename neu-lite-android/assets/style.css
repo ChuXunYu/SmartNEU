@@ -364,3 +364,219 @@ main{padding:0 18px 24px}
   .netcard{border-right:0;border-bottom:1px solid var(--line-soft);padding:16px 0}
   .netcard:last-child{border-bottom:0;padding-left:0}
 }
+/* ============================================================
+   2026 视觉修订：白纸册页 · 米色作书口
+   —— 修正“整页都刷成 Solar 米白”的问题：
+   画布/书桌用暖灰，纸面用近白，Solar 米色只做统计带、准考证、
+   GPA、当前档位、今天等强调面。
+   ============================================================ */
+:root{
+  --canvas:#E9E0D0;
+  --paper:#FFFDF8;
+  --paper-2:#F7F0E2;
+  --paper-3:#EDE2CF;
+  --cream:#F8EED9;
+  --cream-2:#F2E3C7;
+  --ink:#171411;
+  --ink-2:#3A332A;
+  --muted:#6C6355;
+  --red:#A83A2B;
+  --red-deep:#792A20;
+  --line:rgba(23,20,17,.17);
+  --line-soft:rgba(23,20,17,.075);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --canvas:#0B0907;
+    --paper:#171410;
+    --paper-2:#1E1913;
+    --paper-3:#272017;
+    --cream:#211A12;
+    --cream-2:#2A2117;
+    --ink:#F0E8D8;
+    --ink-2:#D2C7B4;
+    --muted:#A79B86;
+    --red:#D45A43;
+    --red-deep:#E47058;
+    --line:rgba(240,232,216,.20);
+    --line-soft:rgba(240,232,216,.09);
+  }
+}
+html{background:var(--canvas)}
+body{background:var(--canvas)}
+body::before{opacity:.32}
+@media (prefers-color-scheme: dark){body::before{opacity:.22}}
+
+.app{width:calc(100% - 14px);max-width:640px;margin:0 auto;background:var(--paper);
+  border-left:1px solid var(--line-soft);border-right:1px solid var(--line-soft);
+  box-shadow:0 0 0 1px rgba(23,20,17,.035), 0 18px 50px rgba(40,32,22,.06);
+  display:flex;flex-direction:column;min-height:100vh}
+
+/* 页眉 */
+.masthead{padding:20px 22px 0;background:var(--paper);border-bottom:0;box-shadow:none}
+.topline{padding-bottom:2px}
+.brand-name{font-size:17px;letter-spacing:3.5px}
+.brand-sub{color:var(--muted);letter-spacing:3px}
+.seal{width:36px;height:36px;font-size:21px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)}
+.linkbtn{color:var(--ink-2)}
+.avatar{border-color:var(--ink);color:var(--ink);background:transparent}
+.hello{margin:28px 0 22px}
+.kicker{color:var(--muted);letter-spacing:2.8px}
+h1#greet{font-size:31px;letter-spacing:2.2px;margin:9px 0 7px;color:var(--ink)}
+.who{color:var(--muted);letter-spacing:1.2px}
+
+/* 统计带：Solar 米色只用在这里 */
+.ledger{margin:0 -22px;padding:15px 22px 17px;background:var(--cream);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.cell{padding:0 12px 0 0;border-right:1px solid var(--line-soft)}
+.cell:last-child{border-right:0;padding-left:14px}
+.cell:first-child{padding-left:0}
+.cell b{font-size:27px;color:var(--ink)}
+.cell span{font-size:8.5px;letter-spacing:2px;color:var(--muted)}
+.updated{margin:0 -22px;padding:10px 22px 11px;border-bottom:1px solid var(--line-soft);
+  background:var(--paper);font-size:9px;color:var(--muted);letter-spacing:1.4px}
+
+/* 主体与章节 */
+main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
+.section-head{margin:30px 0 16px;padding-bottom:9px;border-bottom:1px solid var(--ink)}
+.section-head h3{font-size:16px;letter-spacing:2.4px}
+.section-head h3 i{font-size:9px;letter-spacing:1.8px;color:var(--red)}
+.textbtn{color:var(--muted);border-bottom-color:var(--line);font-size:10px}
+.subhead{margin-top:34px}
+.panel{animation:pagein .18s ease both}
+.panel::after{content:"止";display:grid;place-items:center;width:20px;height:20px;
+  margin:36px auto 2px;border:1px solid var(--red);color:var(--red);
+  font-family:var(--serif);font-size:10px;line-height:1;transform:rotate(-2deg);opacity:.55}
+@keyframes pagein{from{opacity:.6;transform:translateY(2px)}to{opacity:1;transform:none}}
+
+/* 课表 */
+.weekcard{padding:16px 0 0;border-bottom:1px solid var(--line)}
+.weeknav{gap:16px}
+.navbtn{width:36px;height:32px;border-color:var(--line);color:var(--ink-2);font-size:15px}
+.weeklabel #weekTitle{font-size:16px;letter-spacing:2.6px}
+#weekRange{font-size:9.5px;letter-spacing:1.7px}
+.weekview{border-top:1px solid var(--line)}
+.weekday{grid-template-columns:64px 1fr;border-bottom:1px solid var(--line-soft);position:relative}
+.wdhead{padding:15px 10px 14px 0;border-right:1px solid var(--line-soft)}
+.wdhead b{font-size:13.5px;letter-spacing:1.4px}
+.wdhead span{font-size:9px;letter-spacing:.8px;margin-top:4px}
+.wdbody{padding:10px 0 11px 14px}
+.wdev{padding:6px 0}
+.wdev .t{font-size:11px;color:var(--ink-2)}
+.wdev .n{font-size:12.5px;letter-spacing:.2px}
+.wdev .m{font-size:9px;color:var(--muted)}
+.weekday.today{background:var(--cream);box-shadow:inset 2px 0 0 var(--red)}
+.weekday.today .wdhead{border-right-color:var(--line)}
+.weekday.today .wdhead b,.weekday.today .wdhead span{color:var(--red)}
+.dayhead{margin:24px 0 4px}
+.dayhead h3{letter-spacing:2.4px}
+.timeline{border-top:1px solid var(--line)}
+.slot{padding:17px 0 17px 14px}
+.slot .time{font-size:15px}
+.slot .name{font-size:15.5px}
+
+/* 考试：米色准考证 */
+.examlist{display:flex;flex-direction:column;gap:12px;padding-top:2px}
+.exam{grid-template-columns:64px 1fr auto;gap:0;padding:0;margin:0;align-items:stretch;
+  background:var(--cream);border:1px solid var(--line-soft);border-left:2px solid var(--red)}
+.exam .datebox{border-right:1px dashed var(--line);padding:16px 12px 15px 14px;
+  display:flex;flex-direction:column;justify-content:center}
+.exam .datebox b{font-size:27px}
+.exam .datebox span{font-size:9px;letter-spacing:1.6px;margin-top:6px}
+.exam .datebox i{font-size:9px;letter-spacing:1.2px;margin-top:3px}
+.exam .info{padding:15px 12px 15px 14px;min-width:0}
+.exam .co{font-size:15.5px;margin-bottom:7px}
+.exam .meta{font-size:10px;line-height:1.95}
+.exam .status{margin:15px 11px 0 0;align-self:flex-start}
+.exam .status.now{background:var(--red);color:var(--paper)}
+#examNote{margin:0 0 12px;text-align:left;letter-spacing:.8px;color:var(--muted)}
+#examNote:empty{display:none}
+#examNote::before{content:"";display:inline-block;width:5px;height:5px;background:var(--red);
+  margin-right:8px;transform:translateY(-1px)}
+.pill{white-space:nowrap}
+.pill + .pill::before{content:none}
+.exam .meta{display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline}
+.weekday.today .wdhead{padding-left:6px}
+.weekday.today .wdbody{padding-left:18px}
+
+/* 成绩 */
+.gpahero{grid-template-columns:1fr auto;gap:18px;align-items:center;
+  background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:18px 16px;margin:2px 0 4px}
+.gpa-num b{font-size:50px}
+.gpa-num span{font-size:8.5px;letter-spacing:2.2px;margin-top:9px}
+.gpa-meta{border-left:1px solid var(--line);padding:2px 0 2px 18px;min-width:124px}
+.gpa-meta h4{font-size:8.5px;letter-spacing:2.2px}
+.gpa-meta .rank{font-size:21px}
+.gradelist{margin-top:2px}
+.grade{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:4px 14px;
+  padding:15px 0 13px;border-bottom:1px solid var(--line-soft)}
+.grade .g-name{min-width:0}
+.grade .g-name b{font-size:15px}
+.grade .g-name span{font-size:9.5px;letter-spacing:.5px;margin-top:3px}
+.grade .score{font-size:22px;min-width:44px}
+.grade .g-bar{grid-column:1/-1;height:1px;background:var(--line-soft);margin-top:9px;position:relative;overflow:hidden}
+.grade .g-bar i{display:block;height:1px;background:var(--ink-2);opacity:.35}
+
+/* 网费 */
+.netcards{grid-template-columns:1fr 1fr;margin:0 -22px;padding:0 22px;background:var(--cream);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.netcard{padding:19px 16px 18px 0;border-right:1px solid var(--line-soft)}
+.netcard.full{grid-column:1/-1;border-right:0;padding:20px 0 18px}
+.netcard:last-child{padding-left:16px}
+.netcard .k{font-size:8.5px;letter-spacing:2.2px}
+.netcard .v{font-size:36px}
+.netcard .v small{font-size:11px}
+.netplan{margin:0 -22px;padding:22px 22px 6px;border-bottom:1px solid var(--line)}
+.plan-usage input{font-size:32px;border-bottom-color:var(--ink)}
+.plan-fee b{font-size:26px}
+.freebar{height:6px;background:var(--paper-3)}
+.ruler{height:11px;margin-top:16px}
+.ruler .seg{background:transparent}
+.ruler .seg:first-child{background:var(--cream-2)}
+.ruler .mark{width:2px;height:19px;top:-4px}
+.ticks span{font-size:8.5px}
+.tiertable{margin-top:10px}
+.tierrow{grid-template-columns:22px 76px 1fr;padding:10px 0 10px 8px;font-size:11px;
+  border-bottom:1px solid var(--line-soft);border-left:2px solid transparent}
+.tierrow i{font-size:11px}
+.tierrow.on{background:var(--cream);border-left-color:var(--red)}
+.tierrow.on .r,.tierrow.on .rule{color:var(--red)}
+.plan-note{font-size:9px;line-height:2;margin:14px 0 18px}
+.links{margin-bottom:4px}
+.link{padding:15px 2px;font-size:12.5px}
+
+/* 底部导航与更多 */
+.tabbar{width:min(calc(100% - 14px),640px);background:var(--paper);border-top:1px solid var(--line);
+  box-shadow:0 -8px 24px rgba(40,32,22,.05);padding:7px 0 calc(7px + env(safe-area-inset-bottom))}
+.tab{color:var(--muted);font-size:11px;letter-spacing:1.6px}
+.tab i{color:var(--muted);font-size:8.5px}
+.tab.active{color:var(--ink)}
+.tab.active i{color:var(--red)}
+.tab.active::before{width:18px;height:2px}
+.sheetmask{background:rgba(18,15,12,.56)}
+.sheet{width:min(calc(100% - 14px),640px);background:var(--paper);border-top:3px solid var(--red);
+  box-shadow:0 -24px 60px rgba(0,0,0,.25);padding:24px 22px calc(20px + env(safe-area-inset-bottom))}
+.sheet::before{content:"";display:block;width:34px;height:2px;background:var(--line);
+  margin:-10px auto 18px}
+.sheet-title{font-size:16px;letter-spacing:2.6px;margin:0 0 10px}
+.sheet-item{padding:16px 2px;font-size:13px;letter-spacing:.8px}
+.sheet-item i{font-size:15px}
+.sheet-foot{margin-top:18px;font-size:9px;letter-spacing:.7px}
+
+/* 登录 */
+.loginview{background:var(--canvas)}
+.loginbox{width:min(100%,380px);background:var(--paper);border:1px solid var(--line);
+  box-shadow:0 26px 70px rgba(44,34,22,.14), 0 0 0 1px rgba(23,20,17,.03);
+  padding:38px 30px 28px}
+.loginbox::before{height:2px;background:var(--red)}
+.loginbox h1{font-size:32px;letter-spacing:5px}
+.loginsub{color:var(--muted);letter-spacing:2.8px}
+.flabel{color:var(--muted)}
+.field{border-bottom-color:var(--ink)}
+.btn-primary{background:var(--ink);color:var(--paper)}
+.login-hint{color:var(--muted);line-height:1.9}
+
+/* 选择与细节 */
+::selection{background:var(--red);color:var(--paper)}
+
