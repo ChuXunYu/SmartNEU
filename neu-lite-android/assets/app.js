@@ -132,7 +132,7 @@ async function refresh() {
     saveCache(d);
     setUpdated(Date.now());
     finishRefresh(true);
-    loadIpwg();
+    setTimeout(loadIpwg, 500);
   } catch (e) {
     toast("更新失败：" + e.message);
     finishRefresh(false);
@@ -160,22 +160,6 @@ async function loadIpwg() {
 }
 
 let silentLoading = false;
-async function silentRefresh() {
-  if (silentLoading) return;
-  silentLoading = true;
-  try {
-    const d = await api("/api/overview");
-    if (d.schedule && Array.isArray(d.schedule.courses) && state.schedule) {
-      state.schedule.courses = d.schedule.courses;
-      if (state.data) state.data.schedule = state.schedule;
-      saveCache(state.data);
-    }
-  } catch (e) {
-    // 后台失败不打扰
-  } finally {
-    silentLoading = false;
-  }
-}
 
 async function boot() {
   try {
@@ -197,10 +181,6 @@ async function boot() {
     renderAll(cache.data);
     renderStats(state.tab, false);
     setUpdated(cache.at);
-    if (!(cache.data.net && cache.data.net.usage_gb != null)) loadIpwg();
-    if (!(cache.data.schedule && cache.data.schedule.courses)) {
-      setTimeout(silentRefresh, 300);
-    }
     return;
   }
   // 首次安装：先用本地资料占位，再拉一次
@@ -478,14 +458,12 @@ async function loadWeek(delta) {
   const anchor = new Date((state.weekStart || sundayOf(new Date())).getTime() + delta * 7 * 86400000);
   try {
     const local = computeWeek(anchor);
-    if (local) {
-      state.selectedDay = null;
-      renderSchedule(local);
+    if (!local) {
+      toast("本地还没有整学期课表，请点「更多 → 刷新数据」更新一次");
       return;
     }
-    const s = await api(`/api/schedule?start=${ymd(anchor)}`);
     state.selectedDay = null;
-    renderSchedule(s);
+    renderSchedule(local);
   } catch (e) { toast(e.message); }
   finally {
     weekBusy = false;
@@ -817,7 +795,6 @@ function activateTab(name) {
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
   renderStats(name, true);
-  if (name === "net" && state.data && state.data.net && state.data.net.usage_gb == null) loadIpwg();
   window.scrollTo(0, 0);
 }
 $$(".tab").forEach((btn) => btn.addEventListener("click", () => {
