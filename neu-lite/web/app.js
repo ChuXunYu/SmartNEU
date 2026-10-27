@@ -77,7 +77,7 @@ function nativeCallAsync(action, payload) {
           if (j.error) { const e = new Error(j.error); e.code = j.code; reject(e); }
           else resolve(j);
         } catch (e) { reject(e); }
-      } else if (Date.now() - started > 120000) {
+      } else if (Date.now() - started > 20000) {
         clearInterval(timer);
         reject(new Error("请求超时"));
       }
@@ -106,6 +106,18 @@ const api = window.NEU ? nativeApi : httpApi;
 /* ---------------- 启动与缓存 ---------------- */
 const CACHE_KEY = "neu.overview.v2";
 let refreshing = false;
+let refreshGuard = null;
+let refreshId = 0;
+
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
 
 function loadCache() {
   try {
@@ -145,27 +157,36 @@ function startRefresh() {
   const chip = $("#updateChip");
   chip.classList.remove("hidden", "done");
   $("#updateText").textContent = "正在更新";
-}
-function finishRefresh(ok) {
-  // 至少让“更新中”停留 600ms，避免一闪而过
-  const delay = Math.max(0, 600 - (performance.now() - refreshStartedAt));
-  setTimeout(() => {
+  // 硬截止：无论底层请求发生什么，22 秒后一定收掉动画
+  clearTimeout(refreshGuard);
+  refreshGuard = setTimeout(() => {
+    refreshId++;
+    refreshing = false;
+    refreshGuard = null;
     document.body.classList.remove("updating");
     $("#progress").classList.add("hidden");
-    const chip = $("#updateChip");
-    if (!ok) { chip.classList.add("hidden"); return; }
-    chip.classList.add("done");
-    $("#updateText").textContent = "已更新";
-    setTimeout(() => chip.classList.add("hidden"), 900);
-  }, delay);
+    $("#updateChip").classList.add("hidden");
+    toast("更新超时，请稍后重试");
+  }, 22000);
+}
+function finishRefresh(ok) {
+  if (refreshGuard) { clearTimeout(refreshGuard); refreshGuard = null; }
+  // 数据一到就立刻收掉动画，不再做“已更新”停留
+  document.body.classList.remove("updating");
+  $("#progress").classList.add("hidden");
+  const chip = $("#updateChip");
+  chip.classList.remove("done");
+  chip.classList.add("hidden");
 }
 
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
+  const myId = ++refreshId;
   startRefresh();
   try {
-    const d = await api("/api/overview");
+    const d = await withTimeout(api("/api/overview"), 20000, "更新超时（20 秒）");
+    if (myId !== refreshId) return;
     renderAll(d);
     renderStats(state.tab, false);
     saveCache(d);
@@ -173,10 +194,11 @@ async function refresh() {
     finishRefresh(true);
     setTimeout(loadIpwg, 500);
   } catch (e) {
+    if (myId !== refreshId) return;
     toast("更新失败：" + e.message);
     finishRefresh(false);
   } finally {
-    refreshing = false;
+    if (myId === refreshId) refreshing = false;
   }
 }
 
