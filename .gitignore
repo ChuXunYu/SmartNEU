@@ -1,0 +1,41 @@
+# ==== 逆向/工具产物（不入库） ====
+_apk/
+_blutter_out/
+_jadx/
+_tools/
+artifacts/
+智慧东大.apk
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+neu-lite/build/
+neu-lite/dist/
+neu-lite/*.spec
+
+# ==== 本地状态 / 密钥（绝不入库） ====
+state.json
+probe.json
+probe_out/
+*.pem
+*.keystore
+_tgt*
+_wvcookie*
+_ipgwticket*
+
+# ==== Android 构建产物 ====
+neu-lite-android/build/
+neu-lite-android/test/out/
+*.idsig
+
+# ==== 临时文件 ====
+_*.py
+_*.txt
+_*.html
+_*.json
+_*.csv
+_*.png
+_*.sh
+final*.png
+.ws
+neu-lite/docs/_*.png
