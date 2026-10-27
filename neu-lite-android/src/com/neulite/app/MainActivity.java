@@ -99,7 +99,7 @@ public class MainActivity extends Activity {
     public String exportCsv(String kind) {
         try {
             String csv = "exams".equals(kind) ? api.examsCsv() : api.timetableCsv();
-            String name = ("exams".equals(kind) ? "考试安排" : "课表") + ".csv";
+            String name = ("exams".equals(kind) ? "考试安排" : api.scheduleFileName()) + ".csv";
             return writeCsv(name, csv.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             return "ERR:" + e.getMessage();

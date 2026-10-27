@@ -265,7 +265,9 @@ class Handler(BaseHTTPRequestHandler):
                         return self._json({"error": "演示模式不导出"}, 400)
                     tt = self.ctx.jwxt.timetable()
                     body = exports.timetable_csv(tt.get("courses") or [], tt.get("term_name", ""))
-                    return self._file(body, "课表.csv", "text/csv; charset=utf-8")
+                    profile = self.ctx.st.profile or {}
+                    base = (str(profile.get("name") or "") + str(profile.get("xgh") or "")).strip() or "课表"
+                    return self._file(body, base + ".csv", "text/csv; charset=utf-8")
                 if p == "/sso":
                     target = q.get("url") or config.SSO_SERVICES.get(q.get("target", ""))
                     if not self._sso_allowed(target):

@@ -1573,57 +1573,108 @@ public class Api {
         return sb.toString();
     }
 
+    static boolean isClassGroupToken(String s) {
+        return s != null && s.matches("[^,\\s]+\\(\\d+\\)(?:,[^,\\s]+\\(\\d+\\))*");
+    }
+
+    static String cleanPlace(JSONObject c) {
+        String raw = str(c, "place").replace("*", "").trim();
+        if (raw.isEmpty() || "停课".equals(raw)) return "暂未安排教室";
+        java.util.Set<String> teachers = new java.util.HashSet<>();
+        for (String x : str(c, "teacher").split("[,，、/\\s]+")) {
+            if (!x.isEmpty()) teachers.add(x);
+        }
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        for (String p : raw.split("\\s+")) {
+            if (!p.isEmpty()) parts.add(p);
+        }
+        parts.removeIf(p -> teachers.contains(p) || p.endsWith("校区"));
+        while (parts.size() > 1 && isClassGroupToken(parts.get(parts.size() - 1))) {
+            parts.remove(parts.size() - 1);
+        }
+        if (parts.size() == 1 && isClassGroupToken(parts.get(0))) parts.clear();
+        String out = String.join(" ", parts).trim();
+        return out.isEmpty() ? "暂未安排教室" : out;
+    }
+
+    static String weeksFromNumbers(JSONArray arr) {
+        if (arr == null) return "";
+        java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+        for (int i = 0; i < arr.length(); i++) {
+            int n = arr.optInt(i, 0);
+            if (n > 0) set.add(n);
+        }
+        if (set.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        int start = -1, prev = -1;
+        for (int n : set) {
+            if (start < 0) { start = prev = n; continue; }
+            if (n == prev + 1) { prev = n; continue; }
+            if (sb.length() > 0) sb.append("、");
+            sb.append(start == prev ? start + "周" : start + "-" + prev + "周");
+            start = prev = n;
+        }
+        if (sb.length() > 0) sb.append("、");
+        sb.append(start == prev ? start + "周" : start + "-" + prev + "周");
+        return sb.toString();
+    }
+
+    static String cleanWeek(JSONObject c) {
+        String raw = str(c, "weeks_text");
+        int bracket = raw.indexOf('[');
+        if (bracket >= 0) raw = raw.substring(0, bracket);
+        int slash = raw.indexOf('/');
+        if (slash >= 0) raw = raw.substring(0, slash);
+        String text = raw.replace(",", "、").replace("，", "、")
+                .replace("(", "").replace(")", "").trim();
+        if (text.startsWith("第")) text = text.substring(1);
+        return text.isEmpty() ? weeksFromNumbers(c.optJSONArray("weeks")) : text;
+    }
+
+    public String scheduleFileName() {
+        JSONObject p = st.optJSONObject("profile");
+        String base = (str(p, "name") + str(p, "xgh")).trim();
+        return base.isEmpty() ? "课表" : base;
+    }
+
     public String timetableCsv() throws Exception {
         JSONObject term = currentTerm();
         JSONObject tt = jwTimetable(str(term, "term"));
         JSONArray courses = tt.optJSONArray("courses");
-        List<JSONObject> list = new ArrayList<>();
+        java.util.List<String[]> rows = new java.util.ArrayList<>();
         if (courses != null) {
             for (int i = 0; i < courses.length(); i++) {
                 JSONObject c = courses.optJSONObject(i);
-                if (c != null) list.add(c);
+                if (c == null || !c.optBoolean("arranged")) continue;
+                int day = c.optInt("day", 0);
+                int begin = c.optInt("begin_section", 0);
+                int end = c.optInt("end_section", 0);
+                if (day < 1 || day > 7 || begin < 1 || end < begin || end > 12) continue;
+                String courseName = str(c, "course").trim();
+                if (courseName.isEmpty()) continue;
+                String place = cleanPlace(c);
+                if ("停课".equals(place)) continue;
+                String teacher = str(c, "teacher").trim();
+                if (teacher.isEmpty()) teacher = "暂未安排教师";
+                rows.add(new String[]{courseName, String.valueOf(day), String.valueOf(begin),
+                        String.valueOf(end), teacher, place, cleanWeek(c)});
             }
         }
-        list.sort((a, b) -> {
-            int da = dayOrder(a.optInt("day", 0)), db = dayOrder(b.optInt("day", 0));
-            if (da != db) return Integer.compare(da, db);
-            int cmp = str(a, "begin").compareTo(str(b, "begin"));
+        rows.sort((a, b) -> {
+            int cmp = Integer.compare(Integer.parseInt(a[1]), Integer.parseInt(b[1]));
             if (cmp != 0) return cmp;
-            return str(a, "course").compareTo(str(b, "course"));
+            cmp = Integer.compare(Integer.parseInt(a[2]), Integer.parseInt(b[2]));
+            if (cmp != 0) return cmp;
+            cmp = Integer.compare(Integer.parseInt(a[3]), Integer.parseInt(b[3]));
+            if (cmp != 0) return cmp;
+            return a[0].compareTo(b[0]);
         });
         StringBuilder sb = new StringBuilder("\ufeff");
-        csvRow(sb, "学期", "课程名称", "课程代码", "教学班", "教学班名称", "教师", "星期", "节次",
-                "开始时间", "结束时间", "上课地点", "校区", "周次", "学分",
-                "排课类型", "原始周次", "备注");
-        String termName = str(term, "term_name");
-        for (JSONObject c : list) {
-            int day = c.optInt("day", 0);
-            boolean arranged = c.optBoolean("arranged") && day >= 1 && day <= 7;
-            String sections = "";
-            if (c.optInt("begin_section", 0) > 0 && c.optInt("end_section", 0) > 0) {
-                sections = "第" + c.optInt("begin_section") + "-" + c.optInt("end_section") + "节";
-            }
-            String kind = str(c, "kind");
-            String kindName = "arrangedList".equals(kind) ? "正常上课"
-                    : ("practiceList".equals(kind) ? "集中实践" : "未排课");
-            csvRow(sb,
-                    termName,
-                    str(c, "course"),
-                    str(c, "code"),
-                    str(c, "teach_class"),
-                    str(c, "teach_class_name"),
-                    str(c, "teacher"),
-                    arranged ? dayName(day) : "",
-                    arranged ? sections : "",
-                    arranged ? str(c, "begin") : "",
-                    arranged ? str(c, "end") : "",
-                    str(c, "place"),
-                    str(c, "campus"),
-                    str(c, "weeks_text"),
-                    str(c, "credit"),
-                    kindName,
-                    str(c, "weeks_text"),
-                    str(c, "cell_detail"));
+        csvRow(sb, "课程名称", "星期", "开始节数", "结束节数", "老师", "地点", "周数");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String[] row : rows) {
+            String key = String.join("\u0001", row);
+            if (seen.add(key)) csvRow(sb, row);
         }
         return sb.toString();
     }
