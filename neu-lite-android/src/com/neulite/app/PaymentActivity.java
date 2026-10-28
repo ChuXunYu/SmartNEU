@@ -106,7 +106,13 @@ public class PaymentActivity extends Activity {
                 return handle(url);
             }
         });
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onReceivedTitle(WebView view, String title) {
+                super.onReceivedTitle(view, title);
+                android.util.Log.d("NeuPay", "title=" + title + " url=" + view.getUrl());
+            }
+        });
 
         if (url != null && !url.isEmpty()) web.loadUrl(url);
     }

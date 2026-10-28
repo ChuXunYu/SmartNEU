@@ -8,6 +8,8 @@ import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+from . import webvpn
+
 MAIL_SSO = "https://mails.neu.edu.cn/coremail/cmcu_addon/dbdxsso.jsp"
 MAIL_API = "https://mails.neu.edu.cn/coremail/s"
 
@@ -33,12 +35,21 @@ def _decode(value: str) -> str:
         return value or ""
 
 
-def _sso(sess) -> tuple[str, str]:
+def _sso(sess) -> tuple[str, str, str]:
     r = sess.s.get(MAIL_SSO, timeout=20, allow_redirects=True)
     sid = urllib.parse.parse_qs(urllib.parse.urlparse(r.url).query).get("sid", [""])[0]
-    if not sid:
-        raise RuntimeError("邮箱登录失败")
-    return sid, r.url
+    if sid:
+        return sid, r.url, ""
+    if webvpn.login(sess):
+        base = webvpn.proxy_url("mails.neu.edu.cn")
+        t = webvpn.ticket(sess, MAIL_SSO)
+        if t:
+            r = sess.raw_get(base + "/coremail/cmcu_addon/dbdxsso.jsp?ticket=" + urllib.parse.quote(t, safe=""),
+                             timeout=30, allow_redirects=True)
+            sid = urllib.parse.parse_qs(urllib.parse.urlparse(r.url).query).get("sid", [""])[0]
+            if sid:
+                return sid, r.url, base
+    raise RuntimeError("邮箱登录失败（校园网/WebVPN 均不可用）")
 
 
 def _html_text(value: str) -> str:
@@ -50,8 +61,9 @@ def _html_text(value: str) -> str:
 
 
 def fetch(sess, limit: int = 30) -> dict:
-    sid, url = _sso(sess)
-    rr = sess.s.get(MAIL_API, timeout=20, headers={"Referer": url}, params={
+    sid, url, base = _sso(sess)
+    api = base + "/coremail/s" if base else MAIL_API
+    rr = sess.s.get(api, timeout=20, headers={"Referer": url}, params={
         "sid": sid, "func": "mbox:listMessages", "mbox": "Inbox",
         "limit": str(limit), "order": "date", "desc": "1",
     })
@@ -73,12 +85,14 @@ def fetch(sess, limit: int = 30) -> dict:
             "attached": flags.get("attached") == "true",
         })
     unread = sum(1 for x in items if x["unread"])
-    return {"status": "ok", "items": items, "unread": unread, "web_url": url}
+    return {"status": "ok", "items": items, "unread": unread, "web_url": url,
+            "via": "webvpn" if base else "direct"}
 
 
 def fetch_detail(sess, mid: str) -> dict:
-    sid, referer = _sso(sess)
-    rr = sess.s.get(MAIL_API, timeout=25, headers={"Referer": referer}, params={
+    sid, referer, base = _sso(sess)
+    api = base + "/coremail/s" if base else MAIL_API
+    rr = sess.s.get(api, timeout=25, headers={"Referer": referer}, params={
         "sid": sid, "func": "mbox:getMessageData", "mid": mid,
     })
     rr.raise_for_status()
