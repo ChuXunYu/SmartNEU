@@ -383,20 +383,21 @@ function renderExamUpNext() {
     return;
   }
   box.classList.remove("hidden");
-  box.innerHTML = `<div class="examup-head"><b>近期考试</b><span>EXAMS</span></div>` +
-    list.map((e) => {
-      const dt = new Date(e.date + "T00:00:00");
-      const wd = isNaN(dt.getTime()) ? "" : WEEK_NAMES[dt.getDay()];
-      return `<button class="examup-row" data-date="${e.date}" type="button">
-        <span class="eu-date"><b>${e.date.slice(5).replace("-", ".")}</b><i>${wd}</i></span>
-        <span class="eu-main"><b>${esc(e.title)}</b><i>${esc(e.hm)} · ${esc(e.place || "待定")}${e.seat ? " · 座位 " + esc(e.seat) : ""}</i></span>
-        <span class="eu-arrow">↗</span>
-      </button>`;
-    }).join("");
-  $$("#examUpNext .examup-row").forEach((b) => b.addEventListener("click", () => {
+  const e = list[0];
+  const dt = new Date(e.date + "T00:00:00");
+  const wd = isNaN(dt.getTime()) ? "" : WEEK_NAMES[dt.getDay()];
+  const more = list.length > 1 ? `<i class="eu-more">+${list.length - 1}</i>` : "";
+  box.innerHTML = `<button class="examup-line" type="button">
+    <span class="eu-label">近期考试</span>
+    <span class="eu-date">${e.date.slice(5).replace("-", ".")}<i>${wd}</i></span>
+    <span class="eu-main">${esc(e.title)}</span>
+    <span class="eu-meta">${esc(e.hm)} · ${esc(e.place || "待定")}</span>
+    ${more}<span class="eu-arrow">›</span>
+  </button>`;
+  box.querySelector(".examup-line").addEventListener("click", () => {
     activateTab("exams");
     history.replaceState(null, "", "#exams");
-  }));
+  });
 }
 
 function renderSchedule(schedule) {
