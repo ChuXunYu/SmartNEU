@@ -806,3 +806,13 @@ h1#greet{margin:3px 0 3px}
   .netcard .v small{font-size:9px}
   .plan-summary .plan-fee b{font-size:24px}
 }
+
+/* 再收约 5mm：只动留白，不动信息层级 */
+.masthead{padding-top:9px}
+.hello{margin:7px 0 6px}
+h1#greet{margin:2px 0 2px}
+.ledger{padding:7px 22px}
+.updated{padding:2px 22px 3px}
+.section-head{margin:10px 0 7px;padding-bottom:6px}
+.app{padding-bottom:96px}
+body.card-mode #panel-card .section-head{margin:10px 0 8px}
