@@ -294,16 +294,32 @@ function renderHeader(d) {
 }
 
 /* ---------------- 顶部概览（随标签变化） ---------------- */
+function examStatSummary() {
+  const items = examItems();
+  const now = new Date();
+  const today = ymd(now);
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() - now.getDay());
+  const ws = ymd(sunday);
+  const we = ymd(new Date(sunday.getTime() + 6 * 86400000));
+  const week = items.filter((e) => e.date >= ws && e.date <= we).length;
+  const up = items.filter((e) => e.date >= today).sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  if (!up.length) return { week, value: "—", label: "暂无考试" };
+  const days = Math.round((new Date(up[0].date + "T00:00:00") - new Date(today + "T00:00:00")) / 86400000);
+  if (days <= 0) return { week, value: "今天", label: "有考试" };
+  return { week, value: `${days}天`, label: "距下考" };
+}
+
 function statsFor(tab) {
   const d = state.data || {};
   const today = ymd(new Date());
   if (tab === "schedule") {
     const ev = (d.schedule || {}).events || [];
-    const days = new Set(ev.map((e) => (e.start || "").slice(0, 10)));
+    const ex = examStatSummary();
     return [
-      { v: ev.length, l: "本周课程" },
       { v: ev.filter((e) => (e.start || "").slice(0, 10) === today).length, l: "今日课程" },
-      { v: days.size, l: "有课天数" },
+      { v: ex.week, l: "本周考试" },
+      { v: ex.value, l: ex.label },
     ];
   }
   if (tab === "exams") {
