@@ -347,24 +347,79 @@ function renderStats(tab = state.tab, animate = true) {
   }
 }
 
-/* ---------------- 课表 ---------------- */
+/* ---------------- 课表：课程 + 考试 ---------------- */
+function examItems() {
+  const raw = (state.data && state.data.exams && state.data.exams.items) || [];
+  return raw.map((x, i) => {
+    const m = String(x.time || "").match(/(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
+    if (!m) return null;
+    return {
+      kind: "exam", date: m[1], hm: m[2], endHm: m[3],
+      start: `${m[1]}T${m[2]}`, end: `${m[1]}T${m[3]}`,
+      title: x.course || x.title || "考试",
+      place: x.place || "", seat: x.seat || "",
+      key: "exam-" + i,
+    };
+  }).filter(Boolean);
+}
+
+function examsForDate(date) {
+  return examItems().filter((e) => e.date === date);
+}
+
+function renderExamUpNext() {
+  const box = $("#examUpNext");
+  if (!box) return;
+  const ws = state.weekStart ? ymd(state.weekStart) : "";
+  const we = ws ? ymd(new Date(state.weekStart.getTime() + 6 * 86400000)) : "";
+  const today = ymd(new Date());
+  const list = examItems()
+    .filter((e) => e.date >= today && (e.date < ws || e.date > we))
+    .sort((a, b) => (a.start || "").localeCompare(b.start || ""))
+    .slice(0, 3);
+  if (!list.length) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="examup-head"><b>近期考试</b><span>EXAMS</span></div>` +
+    list.map((e) => {
+      const dt = new Date(e.date + "T00:00:00");
+      const wd = isNaN(dt.getTime()) ? "" : WEEK_NAMES[dt.getDay()];
+      return `<button class="examup-row" data-date="${e.date}" type="button">
+        <span class="eu-date"><b>${e.date.slice(5).replace("-", ".")}</b><i>${wd}</i></span>
+        <span class="eu-main"><b>${esc(e.title)}</b><i>${esc(e.hm)} · ${esc(e.place || "待定")}${e.seat ? " · 座位 " + esc(e.seat) : ""}</i></span>
+        <span class="eu-arrow">↗</span>
+      </button>`;
+    }).join("");
+  $$("#examUpNext .examup-row").forEach((b) => b.addEventListener("click", () => {
+    activateTab("exams");
+    history.replaceState(null, "", "#exams");
+  }));
+}
+
 function renderSchedule(schedule) {
   if (!schedule || schedule.error) {
     $("#dayStrip").innerHTML = "";
     $("#timeline").innerHTML = `<div class="empty">${esc(schedule?.error || "暂无课表")}</div>`;
+    $("#examUpNext").classList.add("hidden");
     return;
   }
   state.schedule = schedule;
   const start = new Date((schedule.start || ymd(sundayOf(new Date()))) + "T00:00:00");
   state.weekStart = start;
   $("#weekTitle").textContent = schedule.week ? `第 ${schedule.week} 周` : "课程表";
-  $("#weekRange").textContent = `${schedule.start?.slice(5)} ~ ${schedule.end?.slice(5)}`;
+  const weekExamCount = examItems().filter((e) => e.date >= schedule.start && e.date <= schedule.end).length;
+  $("#weekRange").innerHTML = `${schedule.start?.slice(5)} ~ ${schedule.end?.slice(5)}` +
+    (weekExamCount ? ` <em class="weekexam">考试 ${weekExamCount}</em>` : "");
 
   const today = ymd(new Date());
   const days = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(start.getTime() + i * 86400000);
-    days.push({ date: ymd(d), label: WEEK_NAMES[i], dayNum: d.getDate() });
+    const date = ymd(d);
+    days.push({ date, label: WEEK_NAMES[i], dayNum: d.getDate(), examCount: examsForDate(date).length });
   }
   if (state.selectedDay == null) {
     const todayIndex = days.findIndex((x) => x.date === today);
@@ -372,8 +427,8 @@ function renderSchedule(schedule) {
   }
 
   $("#dayStrip").innerHTML = days.map((d, i) => `
-    <button class="day ${i === state.selectedDay ? "active" : ""} ${d.date === today ? "today" : ""}" data-i="${i}">
-      <b>${d.dayNum}</b><span>${d.label}</span>
+    <button class="day ${i === state.selectedDay ? "active" : ""} ${d.date === today ? "today" : ""} ${d.examCount ? "has-exam" : ""}" data-i="${i}">
+      <b>${d.dayNum}</b><span>${d.label}${d.examCount ? '<i class="dexam"></i>' : ""}</span>
     </button>`).join("");
   $$("#dayStrip .day").forEach((b) => b.addEventListener("click", () => {
     state.selectedDay = Number(b.dataset.i);
@@ -386,23 +441,34 @@ function renderSchedule(schedule) {
     $("#dayTitle").parentElement.classList.remove("hidden");
     renderTimeline(days[state.selectedDay]);
   }
+  renderExamUpNext();
 }
 
 function renderWeek(days) {
   const events = state.schedule?.events || [];
   const today = ymd(new Date());
   const blocks = days.map((d, i) => {
-    const evs = events.filter((e) => (e.start || "").slice(0, 10) === d.date)
-      .sort((a, b) => (a.start || "").localeCompare(b.start || ""));
-    const rows = evs.length
-      ? evs.map((e) => {
+    const evs = events.filter((e) => (e.start || "").slice(0, 10) === d.date);
+    const exams = examsForDate(d.date);
+    const all = [
+      ...evs.map((e) => ({ kind: "course", start: e.start || "", data: e })),
+      ...exams.map((e) => ({ kind: "exam", start: e.start || "", data: e })),
+    ].sort((a, b) => a.start.localeCompare(b.start));
+    const rows = all.length
+      ? all.map((it) => {
+          if (it.kind === "exam") {
+            const e = it.data;
+            const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).map(esc).join(" · ");
+            return `<div class="wdev wexam"><span class="t">${esc(e.hm || "")}</span><span class="n"><i class="wtag">考</i>${esc(e.title)}</span><span class="m">${meta}</span></div>`;
+          }
+          const e = it.data;
           const t = (e.start || "").slice(11, 16);
           const meta = [e.location, e.teacher].filter(Boolean).map(esc).join(" · ");
           return `<div class="wdev"><span class="t">${t}</span><span class="n">${esc(e.title || "课程")}</span><span class="m">${meta}</span></div>`;
         }).join("")
       : `<div class="wdempty">无课</div>`;
-    return `<div class="weekday ${d.date === today ? "today" : ""}">
-      <button class="wdhead" data-i="${i}"><b>${d.label}</b><span>${d.date.slice(5)}</span></button>
+    return `<div class="weekday ${d.date === today ? "today" : ""} ${exams.length ? "has-exam" : ""}">
+      <button class="wdhead" data-i="${i}"><b>${d.label}</b><span>${d.date.slice(5)}</span>${exams.length ? '<i class="wd-exam-dot"></i>' : ""}</button>
       <div class="wdbody">${rows}</div>
     </div>`;
   }).join("");
@@ -431,22 +497,36 @@ $$("#viewToggle button").forEach((b) => b.addEventListener("click", () => {
 
 function renderTimeline(day) {
   const events = (state.schedule?.events || []).filter((e) => (e.start || "").slice(0, 10) === day.date);
+  const exams = examsForDate(day.date);
   $("#dayTitle").textContent = `${day.label} · ${day.date.slice(5)}`;
-  if (!events.length) {
+  const all = [
+    ...events.map((e) => ({ kind: "course", start: e.start || "", data: e })),
+    ...exams.map((e) => ({ kind: "exam", start: e.start || "", data: e })),
+  ].sort((a, b) => a.start.localeCompare(b.start));
+
+  if (!all.length) {
     const now = new Date();
     const nowDate = ymd(now);
     const nowHM = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const cutoff = day.date > nowDate ? day.date : nowDate;
-    const week = (state.schedule?.events || []).filter((e) => {
+    const weekEnd = state.weekStart ? ymd(new Date(state.weekStart.getTime() + 6 * 86400000)) : day.date;
+    const weekCourses = (state.schedule?.events || []).filter((e) => {
       const d = (e.start || "").slice(0, 10);
-      if (d > cutoff) return true;
+      if (d < cutoff || d > weekEnd) return false;
       if (d === cutoff && d === nowDate) return (e.start || "").slice(11, 16) > nowHM;
-      return false;
-    }).sort((a, b) => (a.start || "").localeCompare(b.start || ""));
-    const quick = week.slice(0, 3).map((e) => {
-      const d = new Date((e.start || "").slice(0, 10) + "T00:00:00");
-      const label = isNaN(d.getTime()) ? "" : WEEK_NAMES[d.getDay()];
-      return `<button class="chipbtn quickday" data-date="${(e.start || "").slice(0, 10)}">${label} · ${esc(e.title)}</button>`;
+      return true;
+    }).map((e) => ({ kind: "course", start: e.start || "", data: e }));
+    const weekExams = examItems().filter((e) => e.date >= cutoff && e.date <= weekEnd)
+      .map((e) => ({ kind: "exam", start: e.start || "", data: e }));
+    const week = [...weekCourses, ...weekExams].sort((a, b) => a.start.localeCompare(b.start));
+    const quick = week.slice(0, 4).map((it) => {
+      const e = it.data;
+      const date = (e.start || "").slice(0, 10);
+      const dt = new Date(date + "T00:00:00");
+      const label = isNaN(dt.getTime()) ? "" : WEEK_NAMES[dt.getDay()];
+      const isExam = it.kind === "exam";
+      return `<button class="chipbtn quickday ${isExam ? "quickexam" : ""}" data-date="${date}" data-kind="${it.kind}">
+        ${isExam ? '<i>考</i>' : ""}${label} · ${esc(e.title)}</button>`;
     }).join("");
     $("#timeline").innerHTML = `<div class="empty">${day.label}没有课，休息一下 ☕
       ${week.length ? `<div class="quickwrap"><span class="sub">本周还有：</span><div class="quick">${quick}</div></div>` : ""}
@@ -456,11 +536,21 @@ function renderTimeline(day) {
       for (let i = 0; i < 7; i++) days.push(ymd(new Date(state.weekStart.getTime() + i * 86400000)));
       const idx = days.indexOf(b.dataset.date);
       if (idx >= 0) { state.selectedDay = idx; renderSchedule(state.schedule); }
+      else { activateTab("exams"); history.replaceState(null, "", "#exams"); }
     }));
     return;
   }
-  events.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
-  $("#timeline").innerHTML = events.map((e) => {
+
+  $("#timeline").innerHTML = all.map((it) => {
+    const e = it.data;
+    if (it.kind === "exam") {
+      const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).map(esc).join(" / ");
+      return `<div class="slot examslot">
+        <div class="time"><b>${esc(e.hm || "—")}</b><span>${esc(e.endHm || "")}</span></div>
+        <div class="body"><div class="name"><i class="tag">考试</i>${esc(e.title || "考试")}</div>
+          <div class="meta">${meta}</div></div>
+      </div>`;
+    }
     const t1 = (e.start || "").slice(11, 16);
     const t2 = (e.end || "").slice(11, 16);
     const meta = [e.location, e.teacher, e.sections ? `第${e.sections}节` : ""].filter(Boolean)
