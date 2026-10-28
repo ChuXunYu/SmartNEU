@@ -222,6 +222,11 @@
     <div class="field"><input id="composeTo" autocomplete="email" placeholder="收件人邮箱"></div>
     <div class="field"><input id="composeSubject" placeholder="主题"></div>
     <textarea id="composeBody" placeholder="正文"></textarea>
+    <div class="attachrow">
+      <button id="composeAttach" class="textbtn" type="button">＋ 添加附件</button>
+      <span class="attachhint">最多 3 个，合计 12MB</span>
+    </div>
+    <div id="composeAttachList" class="attachlist"></div>
     <button id="composeSend" class="btn-primary" type="button" disabled>发送</button>
     <button id="composeWebFallback" class="btn-switch hidden" type="button">SMTP 认证失败，改用网页邮箱发送</button>
     <button id="composeCancel" class="btn-switch" type="button">取消</button>

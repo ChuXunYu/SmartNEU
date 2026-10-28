@@ -142,9 +142,18 @@ public class Bridge {
                 if (password.isEmpty()) throw new Exception("请先填写客户端专用密码");
                 if (!p.optString("password").isEmpty()) act.saveMailPassword(p.optString("password"));
                 SmtpClient.send(p.optString("from"), password,
-                        p.optString("to"), p.optString("subject"), p.optString("body"));
+                        p.optString("to"), p.optString("subject"), p.optString("body"),
+                        act.readAttachments());
                 return "{\"status\":\"ok\"}";
             }
+            case "pickAttachments":
+                act.pickAttachments();
+                return ok();
+            case "attachments":
+                return act.attachmentsJson();
+            case "clearAttachments":
+                act.clearAttachments();
+                return ok();
             case "hasMailPassword":
                 return "{\"saved\":" + act.hasMailPassword() + "}";
             case "saveMailPassword":

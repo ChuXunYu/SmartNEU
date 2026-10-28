@@ -3,6 +3,7 @@ package com.neulite.app;
 import android.app.Activity;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -10,6 +11,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.view.View;
@@ -33,11 +35,19 @@ import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 1001;
+    private static final int REQ_ATTACH = 1002;
+    private static final int MAX_ATTACH = 3;
+    private static final long MAX_ATTACH_FILE = 10L * 1024 * 1024;
+    private static final long MAX_ATTACH_TOTAL = 12L * 1024 * 1024;
     private WebView web;
     private Api api;
     private String pendingImportPassword = "";
+    private final List<Uri> attachments = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -114,6 +124,81 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 状态导出
+    public void pickAttachments() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(i, REQ_ATTACH);
+    }
+
+    public void clearAttachments() {
+        attachments.clear();
+    }
+
+    public String attachmentsJson() {
+        JSONArray out = new JSONArray();
+        for (Uri u : attachments) {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("name", displayName(u));
+                o.put("size", querySize(u));
+                o.put("mime", String.valueOf(getContentResolver().getType(u)));
+                out.put(o);
+            } catch (Exception ignored) {}
+        }
+        return out.toString();
+    }
+
+    public List<SmtpClient.Attachment> readAttachments() throws Exception {
+        List<SmtpClient.Attachment> out = new ArrayList<>();
+        long total = 0;
+        for (Uri u : attachments) {
+            byte[] data = readUri(u, MAX_ATTACH_FILE);
+            total += data.length;
+            if (total > MAX_ATTACH_TOTAL) throw new Exception("附件合计不能超过 12MB");
+            String mime = getContentResolver().getType(u);
+            out.add(new SmtpClient.Attachment(displayName(u),
+                    mime == null || mime.isEmpty() ? "application/octet-stream" : mime, data));
+        }
+        return out;
+    }
+
+    private byte[] readUri(Uri uri, long max) throws Exception {
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new Exception("无法读取附件");
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+                if (out.size() > max) throw new Exception("单个附件不能超过 10MB");
+            }
+            return out.toByteArray();
+        }
+    }
+
+    private String displayName(Uri uri) {
+        try (Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (i >= 0) return c.getString(i);
+            }
+        } catch (Exception ignored) {}
+        return "attachment";
+    }
+
+    private long querySize(Uri uri) {
+        try (Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(OpenableColumns.SIZE);
+                if (i >= 0) return c.getLong(i);
+            }
+        } catch (Exception ignored) {}
+        return 0;
+    }
+
     public String getMailPassword() {
         return SecretStore.get(this);
     }
@@ -311,6 +396,21 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_ATTACH) {
+            attachments.clear();
+            if (resultCode == RESULT_OK && data != null) {
+                if (data.getClipData() != null) {
+                    ClipData cd = data.getClipData();
+                    for (int i = 0; i < cd.getItemCount() && attachments.size() < MAX_ATTACH; i++) {
+                        Uri u = cd.getItemAt(i).getUri();
+                        if (u != null) attachments.add(u);
+                    }
+                } else if (data.getData() != null) {
+                    attachments.add(data.getData());
+                }
+            }
+            return;
+        }
         if (requestCode != REQ_IMPORT || resultCode != RESULT_OK || data == null) return;
         Uri uri = data.getData();
         if (uri == null) return;

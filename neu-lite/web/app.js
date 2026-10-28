@@ -343,6 +343,7 @@ async function boot() {
     renderStats(state.tab, false);
     setUpdated(cache.at);
     setTimeout(warmCard, 500);
+    setTimeout(restoreComposeDraft, 900);
     return;
   }
   // 首次安装：先用本地资料占位，再拉一次
@@ -356,6 +357,7 @@ async function boot() {
   showSkeleton();
   await refresh();
   setTimeout(warmCard, 300);
+  setTimeout(restoreComposeDraft, 900);
 }
 
 function greeting() {
@@ -1777,11 +1779,62 @@ function updateComposeReady() {
   $("#composeSend").disabled = !(from.includes("@") && password && to.includes("@"));
 }
 
+function fmtSize(n) {
+  n = Number(n) || 0;
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + " MB";
+  if (n >= 1024) return Math.round(n / 1024) + " KB";
+  return n + " B";
+}
+
+function refreshAttachments() {
+  const list = $("#composeAttachList");
+  if (!list || !window.NEU) return;
+  let arr = [];
+  try { arr = JSON.parse(window.NEU.call("attachments", "{}") || "[]"); } catch {}
+  if (!arr.length) { list.innerHTML = ""; return; }
+  list.innerHTML = arr.map((a) => `<div class="attachitem"><b>${esc(a.name || "附件")}</b><span>${fmtSize(a.size)}</span></div>`).join("")
+    + `<div class="attachitem"><button id="composeAttachClear" class="textbtn" type="button">清空附件</button></div>`;
+}
+
+function pickAttachments() {
+  if (!window.NEU) return;
+  saveComposeDraft();
+  window.NEU.call("pickAttachments", "{}");
+  let tries = 0;
+  const timer = setInterval(() => {
+    refreshAttachments();
+    if (++tries > 40) clearInterval(timer);
+  }, 500);
+}
+
+function clearAttachments() {
+  if (!window.NEU) return;
+  window.NEU.call("clearAttachments", "{}");
+  refreshAttachments();
+}
+
+function saveComposeDraft() {
+  try {
+    localStorage.setItem("neu.mail.draft", JSON.stringify({
+      open: true,
+      from: $("#composeFrom").value,
+      to: $("#composeTo").value,
+      subject: $("#composeSubject").value,
+      body: $("#composeBody").value,
+    }));
+  } catch {}
+}
+
+function clearComposeDraft() {
+  try { localStorage.removeItem("neu.mail.draft"); } catch {}
+}
+
 async function openCompose() {
   if (!window.NEU) {
     toast("桌面端请使用网页邮箱写信");
     return;
   }
+  clearComposeDraft();
   let from = mailSelf();
   $("#composeFromText").textContent = "正在获取…";
   $("#composeFrom").value = "";
@@ -1791,6 +1844,7 @@ async function openCompose() {
   $("#composeBody").value = "";
   $("#composeMsg").textContent = "";
   $("#composeWebFallback").classList.add("hidden");
+  clearAttachments();
   $("#composeMask").classList.remove("hidden");
   if (!from) {
     try {
@@ -1813,6 +1867,8 @@ async function openCompose() {
 function closeCompose() {
   $("#composeMask").classList.add("hidden");
   if (!composePasswordSaved) $("#composePassword").value = "";
+  clearAttachments();
+  clearComposeDraft();
 }
 
 async function sendCompose() {
@@ -1843,6 +1899,24 @@ async function sendCompose() {
   } finally {
     updateComposeReady();
   }
+}
+
+function restoreComposeDraft() {
+  if (!window.NEU || !$("#composeMask").classList.contains("hidden")) return;
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem("neu.mail.draft") || "null"); } catch {}
+  if (!d || !d.open) return;
+  const from = d.from || mailSelf();
+  $("#composeFrom").value = from || "";
+  $("#composeFromText").textContent = from || "未获取到，请刷新邮箱";
+  $("#composeTo").value = d.to || "";
+  $("#composeSubject").value = d.subject || "";
+  $("#composeBody").value = d.body || "";
+  $("#composeMsg").textContent = "";
+  $("#composeWebFallback").classList.add("hidden");
+  setComposePassSaved(readSavedPassword());
+  refreshAttachments();
+  $("#composeMask").classList.remove("hidden");
 }
 
 function closeMail() {
@@ -1934,6 +2008,7 @@ $("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
 $("#mailRefresh").addEventListener("click", () => loadMail(true));
 $("#mailCompose").addEventListener("click", openCompose);
 $("#composeCancel").addEventListener("click", closeCompose);
+$("#composeAttach").addEventListener("click", pickAttachments);
 $("#composeWebFallback").addEventListener("click", () => { closeCompose(); openWebCompose(); });
 $("#composeSend").addEventListener("click", sendCompose);
 $("#composeFrom").addEventListener("input", updateComposeReady);
@@ -1943,6 +2018,9 @@ $("#composePassChange").addEventListener("click", () => {
   try { window.NEU.call("clearMailPassword", "{}"); } catch {}
   setComposePassSaved(false);
   setTimeout(() => $("#composePassword").focus(), 80);
+});
+$("#composeAttachList").addEventListener("click", (e) => {
+  if (e.target && e.target.id === "composeAttachClear") clearAttachments();
 });
 $("#composeMask").addEventListener("focusin", (e) => {
   setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 180);

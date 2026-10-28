@@ -10,6 +10,7 @@ import java.text.SimpleDateFormat;
 import android.util.Base64;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import javax.net.ssl.SNIHostName;
@@ -21,7 +22,24 @@ import javax.net.ssl.SSLSocketFactory;
 final class SmtpClient {
     private SmtpClient() {}
 
+    static final class Attachment {
+        final String name;
+        final String type;
+        final byte[] data;
+
+        Attachment(String name, String type, byte[] data) {
+            this.name = name;
+            this.type = type;
+            this.data = data;
+        }
+    }
+
     static void send(String from, String password, String to, String subject, String body) throws Exception {
+        send(from, password, to, subject, body, null);
+    }
+
+    static void send(String from, String password, String to, String subject, String body,
+                     List<Attachment> attachments) throws Exception {
         Exception last = null;
         Object[][] hosts = {
                 {"mails.neu.edu.cn", 25, "starttls"},
@@ -30,7 +48,7 @@ final class SmtpClient {
         };
         for (Object[] hp : hosts) {
             try {
-                sendOne((String) hp[0], (Integer) hp[1], (String) hp[2], from, password, to, subject, body);
+                sendOne((String) hp[0], (Integer) hp[1], (String) hp[2], from, password, to, subject, body, attachments);
                 return;
             } catch (Exception e) {
                 last = e;
@@ -40,10 +58,10 @@ final class SmtpClient {
     }
 
     private static void sendOne(String host, int port, String mode, String from, String password,
-                                String to, String subject, String body) throws Exception {
+                                String to, String subject, String body, List<Attachment> attachments) throws Exception {
         Socket socket = new Socket();
         socket.connect(new InetSocketAddress(host, port), 12000);
-        socket.setSoTimeout(15000);
+        socket.setSoTimeout(60000);
         if ("ssl".equals(mode)) socket = wrapTls(socket, host, port);
 
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
@@ -81,16 +99,39 @@ final class SmtpClient {
         expect(in, 354);
 
         String date = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z", Locale.US).format(new Date());
-        String msg = "From: " + mime("日在NEU") + " <" + from + ">\r\n"
+        String head = "From: " + mime("日在NEU") + " <" + from + ">\r\n"
                 + "To: <" + to + ">\r\n"
                 + "Subject: " + mime(subject) + "\r\n"
                 + "Date: " + date + "\r\n"
-                + "MIME-Version: 1.0\r\n"
-                + "Content-Type: text/plain; charset=UTF-8\r\n"
-                + "Content-Transfer-Encoding: base64\r\n"
-                + "\r\n"
-                + wrapBase64(Base64.encodeToString(body.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP))
-                + "\r\n.\r\n";
+                + "MIME-Version: 1.0\r\n";
+        boolean hasAttach = attachments != null && !attachments.isEmpty();
+        String msg;
+        if (!hasAttach) {
+            msg = head + "Content-Type: text/plain; charset=UTF-8\r\n"
+                    + "Content-Transfer-Encoding: base64\r\n\r\n"
+                    + wrapBase64(Base64.encodeToString(body.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP))
+                    + "\r\n.\r\n";
+        } else {
+            String boundary = "----neu-lite-" + System.currentTimeMillis();
+            StringBuilder b = new StringBuilder(head)
+                    .append("Content-Type: multipart/mixed; boundary=\"").append(boundary).append("\"\r\n\r\n")
+                    .append("--").append(boundary).append("\r\n")
+                    .append("Content-Type: text/plain; charset=UTF-8\r\n")
+                    .append("Content-Transfer-Encoding: base64\r\n\r\n")
+                    .append(wrapBase64(Base64.encodeToString(body.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP)))
+                    .append("\r\n");
+            for (Attachment a : attachments) {
+                String name = mime(a.name == null ? "attachment" : a.name.replaceAll("[\\r\\n\"]", "_"));
+                String type = a.type == null || a.type.isEmpty() ? "application/octet-stream" : a.type;
+                b.append("--").append(boundary).append("\r\n")
+                        .append("Content-Type: ").append(type).append("; name=\"").append(name).append("\"\r\n")
+                        .append("Content-Transfer-Encoding: base64\r\n")
+                        .append("Content-Disposition: attachment; filename=\"").append(name).append("\"\r\n\r\n")
+                        .append(wrapBase64(Base64.encodeToString(a.data, Base64.NO_WRAP))).append("\r\n");
+            }
+            b.append("--").append(boundary).append("--\r\n");
+            msg = b.toString();
+        }
         write(out, msg);
         expect(in, 250);
         write(out, "QUIT\r\n");
