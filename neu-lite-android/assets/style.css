@@ -665,3 +665,30 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 .mailbody{white-space:pre-wrap;word-break:break-word;font:13px/1.95 var(--sans);
   color:var(--ink-2);margin:18px 0;background:transparent;border:0;padding:0}
 .mailattach{font-size:10px;color:var(--muted);letter-spacing:.4px;border-top:1px solid var(--line-soft);padding-top:12px}
+
+/* ---------------- 校园卡：聚焦通行码页 ---------------- */
+body.card-mode .hello,body.card-mode #ledger,body.card-mode #updatedAt{display:none}
+body.card-mode .masthead{padding-bottom:8px}
+body.card-mode .app{padding-bottom:82px}
+body.card-mode main{padding-bottom:0}
+body.card-mode #panel-card{display:flex;flex-direction:column;min-height:calc(100dvh - 176px)}
+body.card-mode #panel-card::after{display:none}
+body.card-mode #panel-card .section-head{margin:14px 0 10px}
+#panel-card .card-stage{flex:1;min-height:250px;display:flex;align-items:center;justify-content:center;padding:14px 0}
+#panel-card .cardqr{width:min(100%,336px);margin:0 auto;padding:16px 16px 12px;box-shadow:3px 3px 0 var(--line-soft)}
+#panel-card .cardqr #cardQr{width:210px;height:210px;margin:12px auto 8px}
+#panel-card .cardqr #cardQr svg{width:210px;height:210px}
+#panel-card .card-actions{margin-top:8px}
+body.card-mode #panel-card .cardhero{display:grid;grid-template-columns:1fr auto;align-items:end;padding:12px 15px}
+body.card-mode #panel-card .cardwho{grid-column:1/-1;margin-bottom:2px}
+body.card-mode #panel-card .cardwho b{font-size:15px}
+body.card-mode #panel-card .cardbal{margin-top:4px}
+body.card-mode #panel-card .cardbal b{font-size:38px}
+body.card-mode #panel-card .cardsub{grid-column:1/-1;margin-top:5px}
+#panel-card .card-note{margin:10px 0 0;text-align:center;line-height:1.7}
+@media (max-height:720px){
+  #panel-card .card-stage{min-height:210px;padding:8px 0}
+  #panel-card .cardqr #cardQr{width:180px;height:180px;margin:8px auto 6px}
+  #panel-card .cardqr #cardQr svg{width:180px;height:180px}
+  body.card-mode #panel-card .cardbal b{font-size:32px}
+}

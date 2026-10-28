@@ -1275,6 +1275,7 @@ function activateTab(name) {
   const btn = $(`.tab[data-tab="${name}"]`);
   if (!btn) return;
   state.tab = name;
+  document.body.classList.toggle("card-mode", name === "card");
   $$(".tab").forEach((b) => b.classList.toggle("active", b === btn));
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
