@@ -816,3 +816,29 @@ h1#greet{margin:2px 0 2px}
 .section-head{margin:10px 0 7px;padding-bottom:6px}
 .app{padding-bottom:96px}
 body.card-mode #panel-card .section-head{margin:10px 0 8px}
+
+/* ---------------- 成绩：分布与筛选 ---------------- */
+.gpa-meta .rank-sub{font-size:8.5px;letter-spacing:.6px;color:var(--muted);margin-top:5px}
+.grade-dist{margin-top:12px;padding:12px 0 9px;border-bottom:1px solid var(--line)}
+.dist-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:8.5px;letter-spacing:1.8px;color:var(--muted)}
+.dist-head span:last-child{letter-spacing:.6px;font-size:8px}
+.dist-bar{display:flex;gap:2px;height:7px;margin-top:9px;background:var(--paper-3)}
+.dist-bar i{display:block;height:100%;min-width:3px}
+.dist-bar .b90,.dist-legend .b90{background:var(--ink)}
+.dist-bar .b80,.dist-legend .b80{background:var(--celadon)}
+.dist-bar .b70,.dist-legend .b70{background:var(--gold)}
+.dist-bar .b60,.dist-legend .b60{background:#B07A4A}
+.dist-bar .b0,.dist-legend .b0{background:var(--red)}
+.dist-legend{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:8px;font-size:8px;color:var(--muted);letter-spacing:.3px}
+.dist-legend span{display:inline-flex;align-items:center;gap:4px}
+.dist-legend i{width:5px;height:5px;display:inline-block}
+.dist-legend b{font-weight:500;color:var(--ink-2)}
+.grade-filters{display:flex;gap:6px;overflow-x:auto;padding:11px 0 4px;scrollbar-width:none}
+.grade-filters::-webkit-scrollbar{display:none}
+.grade-filter{border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;
+  font-size:9.5px;letter-spacing:.5px;padding:6px 8px;white-space:nowrap;line-height:1}
+.grade-filter i{font-style:normal;font-size:8px;color:var(--muted);margin-left:3px}
+.grade-filter.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.grade-filter.on i{color:var(--paper-3)}
+.gradelist{margin-top:2px}
