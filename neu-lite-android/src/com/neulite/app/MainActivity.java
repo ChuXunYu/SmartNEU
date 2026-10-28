@@ -206,7 +206,7 @@ public class MainActivity extends Activity {
     }
 
     public String getCampusRunUrl() {
-        return SecretStore.getRunUrl(this);
+        return RunUrl.refresh(SecretStore.getRunUrl(this));
     }
 
     public void saveCampusRunUrl(String url) {
