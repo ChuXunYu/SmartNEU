@@ -437,7 +437,7 @@ function statsFor(tab) {
 
 function renderStats(tab = state.tab, animate = true) {
   const led = $("#ledger");
-  if (tab === "net" || tab === "card") { led.classList.add("hidden"); return; }
+  if (tab === "net" || tab === "card" || tab === "run") { led.classList.add("hidden"); return; }
   led.classList.remove("hidden");
   const paint = () => {
     const cells = statsFor(tab);
@@ -1272,6 +1272,13 @@ function clearCampusRunUrl() {
   try { localStorage.removeItem("neu.run.url"); } catch {}
 }
 
+function updateRunPanel() {
+  const el = $("#runTabState");
+  if (!el) return;
+  const url = getCampusRunUrl();
+  el.textContent = url ? "已绑定，可直接打开；链接失效时点「从门户绑定 / 更换」。" : "尚未绑定；请从门户进入一次，或粘贴完整链接。";
+}
+
 function showRunSheet() {
   closeSheet();
   $("#runUrl").value = getCampusRunUrl();
@@ -1290,23 +1297,9 @@ function closeRunSheet() {
   $("#runMask").classList.add("hidden");
 }
 
-$("#btnCampusRun").addEventListener("click", (e) => {
-  if (e && e.__runHeld) return;
-  openCampusRun();
-});
-let runHoldTimer = null;
-let runHoldTriggered = false;
-const runBtn = $("#btnCampusRun");
-runBtn.addEventListener("pointerdown", () => {
-  runHoldTriggered = false;
-  runHoldTimer = setTimeout(() => { runHoldTriggered = true; showRunSheet(); }, 700);
-});
-["pointerup", "pointerleave", "pointercancel"].forEach((ev) => {
-  runBtn.addEventListener(ev, () => { if (runHoldTimer) clearTimeout(runHoldTimer); });
-});
-runBtn.addEventListener("click", (e) => {
-  if (runHoldTriggered) { runHoldTriggered = false; e.preventDefault(); e.stopImmediatePropagation(); }
-}, true);
+$("#btnRunOpenTab").addEventListener("click", openCampusRun);
+$("#btnRunBindTab").addEventListener("click", showRunSheet);
+window.addEventListener("focus", updateRunPanel);
 $("#runPortal").addEventListener("click", () => {
   closeRunSheet();
   openUrlSafe("https://personal.neu.edu.cn/", "从门户绑定校园乐跑");
@@ -2128,10 +2121,64 @@ $("#composePwdHelp").addEventListener("click", (e) => {
 });
 $("#composeMask").addEventListener("click", (e) => { if (e.target === $("#composeMask")) closeCompose(); });
 
+/* ---------------- 可选底部 Tab ---------------- */
+const TAB_DEFS = [
+  { id: "schedule", label: "课表", note: "课程与周历" },
+  { id: "exams", label: "考试", note: "考试安排" },
+  { id: "card", label: "校园卡", note: "余额与校园码" },
+  { id: "grades", label: "成绩", note: "成绩与排名" },
+  { id: "net", label: "网费", note: "余额与流量" },
+  { id: "run", label: "乐跑", note: "校园乐跑 H5" },
+];
+const TABS_KEY = "neu.tabs.v1";
+let tabSettings = {};
+function loadTabSettings() {
+  try { tabSettings = JSON.parse(localStorage.getItem(TABS_KEY) || "{}") || {}; } catch { tabSettings = {}; }
+  TAB_DEFS.forEach((t) => { if (typeof tabSettings[t.id] !== "boolean") tabSettings[t.id] = true; });
+}
+function saveTabSettings() {
+  try { localStorage.setItem(TABS_KEY, JSON.stringify(tabSettings)); } catch {}
+}
+function visibleTabs() {
+  return TAB_DEFS.filter((t) => tabSettings[t.id] !== false);
+}
+function renderTabs() {
+  const enabled = visibleTabs();
+  $$(".tab").forEach((b) => b.classList.toggle("hidden", !tabSettings[b.dataset.tab]));
+  const bar = $(".tabbar");
+  if (bar) bar.style.gridTemplateColumns = `repeat(${Math.max(1, enabled.length)},1fr)`;
+  if (!enabled.some((t) => t.id === state.tab) && enabled.length) activateTab(enabled[0].id);
+}
+function renderTabSettings() {
+  const box = $("#tabsList");
+  if (!box) return;
+  box.innerHTML = TAB_DEFS.map((t) => `<label class="tabrow">
+    <span>${t.label}<small>${t.note}</small></span>
+    <span class="switch"><input type="checkbox" data-tabid="${t.id}" ${tabSettings[t.id] !== false ? "checked" : ""}><i></i></span>
+  </label>`).join("");
+  $$("#tabsList input").forEach((input) => input.addEventListener("change", () => {
+    const id = input.dataset.tabid;
+    const on = input.checked;
+    if (!on && visibleTabs().length <= 1) {
+      input.checked = true;
+      toast("至少保留一个 Tab");
+      return;
+    }
+    tabSettings[id] = on;
+    saveTabSettings();
+    renderTabs();
+    renderTabSettings();
+  }));
+}
+
 /* ---------------- 标签页 ---------------- */
 function activateTab(name) {
   const btn = $(`.tab[data-tab="${name}"]`);
-  if (!btn) return;
+  if (!btn || btn.classList.contains("hidden")) {
+    const first = $$(".tab").find((b) => !b.classList.contains("hidden"));
+    if (first && first.dataset.tab !== name) activateTab(first.dataset.tab);
+    return;
+  }
   state.tab = name;
   document.body.classList.toggle("card-mode", name === "card");
   document.body.classList.toggle("roomy-top", name === "schedule" || name === "exams");
@@ -2139,6 +2186,7 @@ function activateTab(name) {
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
   renderStats(name, true);
+  if (name === "run") updateRunPanel();
   if (name === "card") loadCard();
   else stopQr();
   window.scrollTo(0, 0);
@@ -2163,6 +2211,16 @@ document.addEventListener("click", (e) => {
 applyViewUI();
 if (location.hash) activateTab(location.hash.slice(1));
 else document.body.classList.add("roomy-top");
+$("#btnTabs").addEventListener("click", () => {
+  closeSheet();
+  renderTabSettings();
+  $("#tabsMask").classList.remove("hidden");
+});
+$("#tabsDone").addEventListener("click", () => $("#tabsMask").classList.add("hidden"));
+$("#tabsMask").addEventListener("click", (e) => { if (e.target === $("#tabsMask")) $("#tabsMask").classList.add("hidden"); });
+loadTabSettings();
+renderTabSettings();
+renderTabs();
 boot();
 
 

@@ -105,11 +105,6 @@
           <button id="btnExportKb" class="textbtn">导出课表</button>
         </div>
       </div>
-      <button id="btnCampusRun" class="runentry" type="button">
-        <span class="runentry-mark">跑</span>
-        <span class="runentry-main"><b>校园乐跑</b><small>官方入口 · 登录后自动续签</small></span>
-        <span class="runentry-arrow">→</span>
-      </button>
       <div class="weekcard">
         <div class="weeknav">
           <button id="prevWeek" class="navbtn" aria-label="上一周">←</button>
@@ -177,6 +172,17 @@
       </div>
       <p class="card-note">余额来自校园卡，二维码为 e码通通行码，10 秒自动刷新。</p>
     </section>
+    <section id="panel-run" class="panel hidden">
+      <div class="section-head"><h3><i>06</i>乐跑</h3></div>
+      <div class="runpanel">
+        <div class="runpanel-seal">跑</div>
+        <h2>校园乐跑</h2>
+        <p class="runpanel-note">官方 H5 · 登录后自动续签，只在本机加密保存。</p>
+        <button id="btnRunOpenTab" class="btn-primary" type="button">打开校园乐跑</button>
+        <button id="btnRunBindTab" class="btn-switch" type="button">从门户绑定 / 更换</button>
+        <p id="runTabState" class="runpanel-state"></p>
+      </div>
+    </section>
   </main>
 
   <nav class="tabbar">
@@ -185,6 +191,7 @@
     <button class="tab" data-tab="card"><i>03</i><span>校园卡</span></button>
     <button class="tab" data-tab="grades"><i>04</i><span>成绩</span></button>
     <button class="tab" data-tab="net"><i>05</i><span>网费</span></button>
+    <button class="tab" data-tab="run"><i>06</i><span>乐跑</span></button>
   </nav>
 </div>
 
@@ -239,6 +246,15 @@
   </div>
 </div>
 
+<div id="tabsMask" class="sheetmask hidden">
+  <div class="sheet tabssheet">
+    <div class="sheet-title">界面显示</div>
+    <p class="tabshint">关闭后不在底部 Tab 显示；至少保留一个。</p>
+    <div id="tabsList"></div>
+    <button id="tabsDone" class="btn-primary" type="button">完成</button>
+  </div>
+</div>
+
 <div id="runMask" class="sheetmask hidden">
   <div class="sheet runsheet">
     <div class="sheet-title">校园乐跑</div>
@@ -283,6 +299,7 @@
     <div class="sheet-title">更多</div>
     <a id="linkJwxt" class="sheet-item" href="/sso?target=jwxt" target="_blank" rel="noreferrer"><span>打开教务（免登）</span><i>↗</i></a>
     <button id="btnRefresh" class="sheet-item"><span>刷新数据</span><i>↻</i></button>
+    <button id="btnTabs" class="sheet-item" type="button"><span>界面显示</span><i>☷</i></button>
     <button id="btnExport" class="sheet-item"><span>导出状态文件</span><i>↗</i></button>
     <button id="btnImport" class="sheet-item hidden"><span>导入状态文件</span><i>↙</i></button>
     <div id="fileBlock" class="fileblock hidden">
