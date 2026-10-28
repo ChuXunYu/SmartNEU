@@ -114,6 +114,24 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 状态导出
+    public String getMailPassword() {
+        return SecretStore.get(this);
+    }
+
+    public boolean hasMailPassword() {
+        return SecretStore.has(this);
+    }
+
+    public void saveMailPassword(String password) {
+        try {
+            SecretStore.save(this, password);
+        } catch (Exception ignored) {}
+    }
+
+    public void clearMailPassword() {
+        SecretStore.clear(this);
+    }
+
     public String exportState(String password) {
         try {
             byte[] data = CryptoBox.encrypt(api.exportJson().getBytes(StandardCharsets.UTF_8), password);

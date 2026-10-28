@@ -1598,6 +1598,7 @@ function attachMail(mail, deferDetails = false) {
   mail.unread = items.filter((x) => x.unread).length;
   pruneMailDetails(items);
   state.data = state.data || {};
+  mail.self = mail.self || (state.data.mail && state.data.mail.self) || "";
   state.data.mail = mail;
   state.data.mail_unread = mail.unread;
   saveCache(state.data);
@@ -1744,57 +1745,99 @@ async function openWebCompose() {
   openUrlSafe(base + "#mail.compose", "写信");
 }
 
+let composePasswordSaved = false;
+
+function mailSelf() {
+  const known = (state.data && state.data.mail && state.data.mail.self) || "";
+  if (known) return known;
+  const xgh = (state.session && state.session.profile && state.session.profile.xgh)
+    || (state.data && state.data.profile && state.data.profile.xgh) || "";
+  return xgh ? `${xgh}@stu.neu.edu.cn` : "";
+}
+
+function readSavedPassword() {
+  try {
+    const r = window.NEU && window.NEU.call ? window.NEU.call("hasMailPassword", "{}") : "{}";
+    return !!(JSON.parse(r || "{}").saved);
+  } catch { return false; }
+}
+
+function setComposePassSaved(saved) {
+  composePasswordSaved = !!saved;
+  $("#composePasswordWrap").classList.toggle("hidden", composePasswordSaved);
+  $("#composePassSaved").classList.toggle("hidden", !composePasswordSaved);
+  if (composePasswordSaved) $("#composePassword").value = "";
+  updateComposeReady();
+}
+
 function updateComposeReady() {
   const from = $("#composeFrom").value.trim();
-  const password = $("#composePassword").value;
+  const password = composePasswordSaved || $("#composePassword").value;
   const to = $("#composeTo").value.trim();
   $("#composeSend").disabled = !(from.includes("@") && password && to.includes("@"));
 }
 
-function openCompose() {
+async function openCompose() {
   if (!window.NEU) {
     toast("桌面端请使用网页邮箱写信");
     return;
   }
-  let from = "";
-  try { from = localStorage.getItem("neu.mail.from") || ""; } catch {}
-  $("#composeFrom").value = from;
+  let from = mailSelf();
+  $("#composeFromText").textContent = "正在获取…";
+  $("#composeFrom").value = "";
   $("#composePassword").value = "";
   $("#composeTo").value = "";
   $("#composeSubject").value = "";
   $("#composeBody").value = "";
   $("#composeMsg").textContent = "";
-  updateComposeReady();
   $("#composeMask").classList.remove("hidden");
-  setTimeout(() => $("#composeFrom").focus(), 80);
+  if (!from) {
+    try {
+      const d = await api("/api/mail");
+      attachMail(d);
+      from = d.self || mailSelf();
+    } catch (e) {
+      $("#composeMsg").textContent = "发件邮箱读取失败：" + e.message;
+    }
+  }
+  $("#composeFrom").value = from || "";
+  $("#composeFromText").textContent = from || "未获取到，请刷新邮箱";
+  setComposePassSaved(readSavedPassword());
+  setTimeout(() => {
+    const el = composePasswordSaved ? $("#composeTo") : $("#composePassword");
+    if (el) el.focus();
+  }, 180);
 }
 
 function closeCompose() {
   $("#composeMask").classList.add("hidden");
-  $("#composePassword").value = "";
+  if (!composePasswordSaved) $("#composePassword").value = "";
 }
 
 async function sendCompose() {
   const from = $("#composeFrom").value.trim();
-  const password = $("#composePassword").value;
+  const password = composePasswordSaved ? "" : $("#composePassword").value;
   const to = $("#composeTo").value.trim();
   const subject = $("#composeSubject").value.trim();
   const body = $("#composeBody").value;
-  if (!from || !from.includes("@")) return $("#composeMsg").textContent = "请填写正确的发件邮箱";
-  if (!password) return $("#composeMsg").textContent = "请填写客户端专用密码";
+  if (!from || !from.includes("@")) return $("#composeMsg").textContent = "未获取到发件邮箱，请刷新邮箱";
+  if (!composePasswordSaved && !password) return $("#composeMsg").textContent = "请填写客户端专用密码";
   if (!to || !to.includes("@")) return $("#composeMsg").textContent = "请填写收件人邮箱";
   const btn = $("#composeSend");
   btn.disabled = true;
   $("#composeMsg").textContent = "正在通过 SMTP 发送…";
   try {
-    await api("/api/mail/send", { method: "POST", body: JSON.stringify({ from, password, to, subject, body }) });
-    try { localStorage.setItem("neu.mail.from", from); } catch {}
+    const payload = { from, to, subject, body };
+    if (password) payload.password = password;
+    await api("/api/mail/send", { method: "POST", body: JSON.stringify(payload) });
+    if (password) setComposePassSaved(true);
     toast("邮件已发送");
     closeCompose();
   } catch (e) {
+    if (password) setComposePassSaved(readSavedPassword());
     $("#composeMsg").textContent = "发送失败：" + e.message;
   } finally {
-    btn.disabled = false;
+    updateComposeReady();
   }
 }
 
@@ -1891,6 +1934,14 @@ $("#composeSend").addEventListener("click", sendCompose);
 $("#composeFrom").addEventListener("input", updateComposeReady);
 $("#composePassword").addEventListener("input", updateComposeReady);
 $("#composeTo").addEventListener("input", updateComposeReady);
+$("#composePassChange").addEventListener("click", () => {
+  try { window.NEU.call("clearMailPassword", "{}"); } catch {}
+  setComposePassSaved(false);
+  setTimeout(() => $("#composePassword").focus(), 80);
+});
+$("#composeMask").addEventListener("focusin", (e) => {
+  setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 180);
+});
 $("#composePwdHelp").addEventListener("click", (e) => {
   e.preventDefault();
   openUrlSafe("https://mails.neu.edu.cn/", "申请专用密码");

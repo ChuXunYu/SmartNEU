@@ -975,6 +975,12 @@ public class Api {
             }
             put(out, "unread", String.valueOf(unread));
             put(out, "web_url", sso[0]);
+            try {
+                String page = httpGetString(sso[0], sso[0]);
+                Matcher m = Pattern.compile("[A-Za-z0-9._%+-]+@mails\\.neu\\.edu\\.cn").matcher(page);
+                if (!m.find()) m = Pattern.compile("[A-Za-z0-9._%+-]+@stu\\.neu\\.edu\\.cn").matcher(page);
+                if (m.find()) put(out, "self", m.group());
+            } catch (Exception ignored) {}
         } catch (Exception e) {
             put(out, "status", "partial");
             put(out, "error", e.getMessage());

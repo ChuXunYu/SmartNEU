@@ -949,3 +949,14 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
   background:transparent;color:var(--ink);font:13px/1.7 var(--sans);resize:none;margin-bottom:12px}
 .composesheet .field input:focus,.composesheet #composeBody:focus{border-color:var(--ink)}
 .composesheet .btn-primary{margin-bottom:8px}
+
+/* 写信：键盘弹出时整张表单可滚动，顶部字段不会被顶出屏幕 */
+.composesheet{max-height:calc(100dvh - 12px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+@supports not (height:100dvh){
+  .composesheet{max-height:calc(100vh - 12px)}
+}
+.composefrom{font-size:10px;letter-spacing:.4px;color:var(--muted);padding:2px 0 10px}
+.composefrom b{font-weight:600;color:var(--ink);word-break:break-all}
+.passsaved{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border:1px solid var(--line);padding:10px;margin-bottom:8px;font-size:10px;color:var(--muted)}
+.passsaved .textbtn{color:var(--red)}

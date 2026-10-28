@@ -136,10 +136,23 @@ public class Bridge {
                 return api.mailInfo().toString();
             case "mailDetail":
                 return api.mailDetail(p.optString("id")).toString();
-            case "sendMail":
-                SmtpClient.send(p.optString("from"), p.optString("password"),
+            case "sendMail": {
+                String password = p.optString("password");
+                if (password.isEmpty()) password = act.getMailPassword();
+                if (password.isEmpty()) throw new Exception("请先填写客户端专用密码");
+                if (!p.optString("password").isEmpty()) act.saveMailPassword(p.optString("password"));
+                SmtpClient.send(p.optString("from"), password,
                         p.optString("to"), p.optString("subject"), p.optString("body"));
                 return "{\"status\":\"ok\"}";
+            }
+            case "hasMailPassword":
+                return "{\"saved\":" + act.hasMailPassword() + "}";
+            case "saveMailPassword":
+                act.saveMailPassword(p.optString("password"));
+                return ok();
+            case "clearMailPassword":
+                act.clearMailPassword();
+                return ok();
             case "payCard":
                 return api.createCardOrder(p.optDouble("amount", 0)).toString();
             case "payNet":

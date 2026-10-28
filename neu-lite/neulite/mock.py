@@ -65,7 +65,7 @@ def card_info() -> dict:
 
 def mail_info() -> dict:
     return {
-        "status": "ok", "unread": 2, "web_url": "",
+        "status": "ok", "unread": 2, "web_url": "", "self": "demo@mails.neu.edu.cn",
         "items": [
             {"id": "demo1", "from": "教务处", "subject": "关于期中考试安排的通知",
              "date": "2026-10-27 09:00:00", "size": "12000", "unread": True, "attached": True},

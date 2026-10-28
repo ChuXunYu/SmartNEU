@@ -85,8 +85,16 @@ def fetch(sess, limit: int = 30) -> dict:
             "attached": flags.get("attached") == "true",
         })
     unread = sum(1 for x in items if x["unread"])
+    self_addr = ""
+    try:
+        page = sess.s.get(url, timeout=15)
+        found = re.findall(r"[A-Za-z0-9._%+-]+@(?:mails|stu)\.neu\.edu\.cn", page.text)
+        if found:
+            self_addr = next((x for x in found if x.endswith("@mails.neu.edu.cn")), found[0])
+    except Exception:
+        pass
     return {"status": "ok", "items": items, "unread": unread, "web_url": url,
-            "via": "webvpn" if base else "direct"}
+            "self": self_addr, "via": "webvpn" if base else "direct"}
 
 
 def fetch_detail(sess, mid: str) -> dict:
