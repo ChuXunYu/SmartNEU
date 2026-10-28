@@ -862,6 +862,113 @@ public class Api {
         return out;
     }
 
+    byte[] httpGetBytes(String url, String referer) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setInstanceFollowRedirects(false);
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(20000);
+        c.setRequestProperty("User-Agent", UA);
+        if (referer != null && !referer.isEmpty()) c.setRequestProperty("Referer", referer);
+        String ck = cookieHeaderFor(new URL(url));
+        if (!ck.isEmpty()) c.setRequestProperty("Cookie", ck);
+        int code = c.getResponseCode();
+        if (code >= 400) throw new ApiException(code, "HTTP " + code);
+        InputStream in = c.getInputStream();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        in.close();
+        return out.toByteArray();
+    }
+
+    static String headerValue(String headers, String name) {
+        for (String line : headers.split("\r?\n")) {
+            int i = line.indexOf(':');
+            if (i > 0 && line.substring(0, i).trim().equalsIgnoreCase(name)) {
+                return line.substring(i + 1).trim();
+            }
+        }
+        return "";
+    }
+
+    static String paramValue(String value, String key) {
+        Matcher m = Pattern.compile(key + "=\"([^\"]+)\"|" + key + "=([^;\\s]+)", Pattern.CASE_INSENSITIVE).matcher(value);
+        if (!m.find()) return "";
+        return m.group(1) != null ? m.group(1) : m.group(2);
+    }
+
+    static String decodeTransfer(String body, String encoding, String charset) {
+        try {
+            if ("base64".equalsIgnoreCase(encoding)) {
+                return new String(Base64.decode(body.replaceAll("\\s", ""), Base64.DEFAULT), Charset.forName(charset));
+            }
+            if ("quoted-printable".equalsIgnoreCase(encoding)) {
+                return qpDecode(body, charset);
+            }
+            return new String(body.getBytes(StandardCharsets.ISO_8859_1), Charset.forName(charset));
+        } catch (Exception e) {
+            return body;
+        }
+    }
+
+    public JSONObject mailDetail(String mid) throws Exception {
+        String[] sso = httpGetFollow(MAIL_SSO, 20);
+        String sid = queryParam(sso[0], "sid");
+        if (sid.isEmpty()) throw new ApiException(-1, "邮箱登录失败");
+        String url = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+                + "&func=mbox:getMessageData&mid=" + URLEncoder.encode(mid, "UTF-8");
+        byte[] bytes = httpGetBytes(url, sso[0]);
+        String raw = new String(bytes, StandardCharsets.ISO_8859_1);
+        int split = raw.indexOf("\r\n\r\n");
+        int sepLen = 4;
+        if (split < 0) { split = raw.indexOf("\n\n"); sepLen = 2; }
+        if (split < 0) throw new ApiException(-1, "邮件格式无法解析");
+        String headers = raw.substring(0, split);
+        String body = raw.substring(split + sepLen);
+        String ctype = headerValue(headers, "Content-Type");
+        String boundary = paramValue(ctype, "boundary");
+        String plain = "", html = "";
+        if (!boundary.isEmpty()) {
+            String[] parts = body.split("--" + Pattern.quote(boundary));
+            for (String part : parts) {
+                int p = part.indexOf("\r\n\r\n");
+                if (p < 0) continue;
+                String ph = part.substring(0, p);
+                String pb = part.substring(p + 4);
+                String pct = headerValue(ph, "Content-Type");
+                String enc = headerValue(ph, "Content-Transfer-Encoding");
+                String cs = paramValue(pct, "charset");
+                if (cs.isEmpty()) cs = "UTF-8";
+                if (pct.toLowerCase(Locale.US).contains("text/plain") && plain.isEmpty()) {
+                    plain = decodeTransfer(pb, enc, cs);
+                } else if (pct.toLowerCase(Locale.US).contains("text/html") && html.isEmpty()) {
+                    html = decodeTransfer(pb, enc, cs);
+                }
+            }
+        } else {
+            String enc = headerValue(headers, "Content-Transfer-Encoding");
+            String cs = paramValue(ctype, "charset");
+            if (cs.isEmpty()) cs = "UTF-8";
+            plain = decodeTransfer(body, enc, cs);
+        }
+        String text = plain.trim();
+        if (text.isEmpty() && !html.isEmpty()) {
+            try { text = Html.fromHtml(html).toString().trim(); } catch (Exception ignored) {}
+        }
+        if (text.length() > 120000) text = text.substring(0, 120000);
+        JSONObject out = new JSONObject();
+        put(out, "status", "ok");
+        put(out, "id", mid);
+        put(out, "subject", decodeMime(headerValue(headers, "Subject")));
+        put(out, "from", decodeMime(headerValue(headers, "From")));
+        put(out, "to", decodeMime(headerValue(headers, "To")));
+        put(out, "date", headerValue(headers, "Date"));
+        put(out, "text", text);
+        put(out, "web_url", sso[0]);
+        return out;
+    }
+
     private void payLogin() throws Exception {
         if (payAuthed) return;
         for (int attempt = 0; attempt < 2; attempt++) {

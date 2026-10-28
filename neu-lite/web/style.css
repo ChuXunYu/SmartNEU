@@ -657,3 +657,11 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 }
 
 .card-actions + .cardqr{margin-top:14px}
+
+#mailDetailView{z-index:66}
+.maildetailhead{padding:12px 0 16px;border-bottom:1px solid var(--line-soft)}
+.maildetailhead .subject{font-family:var(--serif);font-size:20px;font-weight:600;line-height:1.5;letter-spacing:.3px}
+.maildetailhead .meta{font-size:10px;color:var(--muted);letter-spacing:.4px;margin-top:8px;line-height:1.8}
+.mailbody{white-space:pre-wrap;word-break:break-word;font:13px/1.95 var(--sans);
+  color:var(--ink-2);margin:18px 0;background:transparent;border:0;padding:0}
+.mailattach{font-size:10px;color:var(--muted);letter-spacing:.4px;border-top:1px solid var(--line-soft);padding-top:12px}

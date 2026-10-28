@@ -75,3 +75,11 @@ def mail_info() -> dict:
              "date": "2026-10-25 10:00:00", "size": "6000", "unread": False, "attached": False},
         ],
     }
+
+
+def mail_detail(mid: str) -> dict:
+    return {"status": "ok", "id": mid, "subject": "关于期中考试安排的通知",
+            "from": "教务处", "to": "20230001@stu.neu.edu.cn",
+            "date": "2026-10-27 09:00:00",
+            "text": "各位同学：\n\n本学期期中考试安排已发布，请登录教务系统查看考场与座位号。\n\n教务处",
+            "attachments": ["考试安排.pdf"], "web_url": ""}

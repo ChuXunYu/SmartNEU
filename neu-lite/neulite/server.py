@@ -129,6 +129,14 @@ class Ctx:
         except Exception as e:
             return {"status": "partial", "items": [], "unread": 0, "error": str(e)}
 
+    def mail_detail(self, mid: str) -> dict:
+        if self.demo:
+            return mock.mail_detail(mid)
+        try:
+            return mail.fetch_detail(self.sess, mid)
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
     def pay_card(self, amount: float) -> dict:
         if self.demo:
             raise RuntimeError("演示模式不充值")
@@ -319,6 +327,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(self.ctx.card_info())
                 if p == "/api/mail":
                     return self._json(self.ctx.mail_info())
+                if p == "/api/mail/detail":
+                    return self._json(self.ctx.mail_detail(q.get("id", "")))
                 if p == "/api/pay/order":
                     return self._json(self.ctx.pay_status(q.get("order_no", "")))
                 if p == "/api/jwxt":

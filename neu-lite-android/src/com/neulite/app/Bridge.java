@@ -128,6 +128,8 @@ public class Bridge {
                 return api.cardInfo().toString();
             case "mail":
                 return api.mailInfo().toString();
+            case "mailDetail":
+                return api.mailDetail(p.optString("id")).toString();
             case "payCard":
                 return api.createCardOrder(p.optDouble("amount", 0)).toString();
             case "payNet":

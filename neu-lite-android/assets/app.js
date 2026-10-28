@@ -96,6 +96,7 @@ async function nativeApi(path, opts = {}) {
     case "/api/ipgw": return nativeCallAsync("ipgw");
     case "/api/card": return nativeCallAsync("card");
     case "/api/mail": return nativeCallAsync("mail");
+    case "/api/mail/detail": return nativeCallAsync("mailDetail", { id: params.get("id") || "" });
     case "/api/pay/card": return nativeCallAsync("payCard", body);
     case "/api/pay/net": return nativeCallAsync("payNet", body);
     case "/api/pay/order": return nativeCallAsync("payOrder", { order_no: params.get("order_no") || "" });
@@ -1033,14 +1034,15 @@ function renderMail(data) {
     list.innerHTML = `<div class="empty">${data.error ? esc(data.error) : "收件箱为空"}</div>`;
     return;
   }
-  list.innerHTML = items.map((x) => `<div class="mailitem ${x.unread ? "unread" : ""}" data-url="${esc(mailWebUrl)}">
+  list.innerHTML = items.map((x) => `<div class="mailitem ${x.unread ? "unread" : ""}" data-url="${esc(mailWebUrl)}" data-id="${esc(x.id)}">
     <div class="from">${esc(x.from || "")}</div>
     <div class="date">${esc((x.date || "").slice(5, 16))}</div>
     <div class="subject">${esc(x.subject || "(无主题)")}</div>
     <div class="flags">${x.attached ? "附件 · " : ""}${x.unread ? "未读" : "已读"}</div>
   </div>`).join("");
   $$("#mailList .mailitem").forEach((el) => el.addEventListener("click", () => {
-    if (el.dataset.url) openUrlSafe(el.dataset.url);
+    if (el.dataset.id) openMailDetail(el.dataset.id);
+    else if (el.dataset.url) openUrlSafe(el.dataset.url);
   }));
 }
 
@@ -1061,12 +1063,37 @@ async function loadMail() {
   }
 }
 
+async function openMailDetail(id) {
+  $("#mailDetailView").classList.remove("hidden");
+  $("#mailDetailHead").innerHTML = `<div class="subject">正在读取邮件…</div>`;
+  $("#mailBody").textContent = "";
+  $("#mailAttach").textContent = "";
+  try {
+    const d = await api(`/api/mail/detail?id=${encodeURIComponent(id)}`);
+    if (d.status !== "ok") throw new Error(d.error || "邮件读取失败");
+    $("#mailDetailHead").innerHTML = `<div class="subject">${esc(d.subject || "(无主题)")}</div>
+      <div class="meta">${esc(d.from || "")}<br>${esc(d.date || "")}</div>`;
+    $("#mailBody").textContent = d.text || "（正文为空）";
+    const atts = d.attachments || [];
+    $("#mailAttach").textContent = atts.length ? "附件：" + atts.join(" · ") : "";
+    mailWebUrl = d.web_url || mailWebUrl;
+  } catch (e) {
+    $("#mailDetailHead").innerHTML = `<div class="subject">邮件读取失败</div>`;
+    $("#mailBody").textContent = e.message;
+  }
+}
+
+function closeMailDetail() {
+  $("#mailDetailView").classList.add("hidden");
+}
+
 function openMail() {
   $("#mailView").classList.remove("hidden");
   loadMail();
 }
 
 function closeMail() {
+  closeMailDetail();
   $("#mailView").classList.add("hidden");
 }
 
@@ -1146,6 +1173,8 @@ $("#payMask").addEventListener("click", (e) => { if (e.target === $("#payMask"))
 $("#btnMail").addEventListener("click", openMail);
 $("#btnCardMail").addEventListener("click", openMail);
 $("#mailBack").addEventListener("click", closeMail);
+$("#mailDetailBack").addEventListener("click", closeMailDetail);
+$("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
 $("#mailRefresh").addEventListener("click", loadMail);
 
 /* ---------------- 标签页 ---------------- */
