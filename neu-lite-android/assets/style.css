@@ -896,3 +896,8 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
   height:32px;padding:0 10px;font:9.5px/1 var(--sans);letter-spacing:1.6px}
 .morebtn:hover{border-color:var(--ink)}
 .mailbadge{right:-5px;top:-5px}
+
+.weekhome{margin-top:3px;border:0;background:transparent;color:var(--red);cursor:pointer;
+  font:8.5px/1.2 var(--sans);letter-spacing:1.4px;padding:2px 0;border-bottom:1px solid transparent}
+.weekhome:hover{border-bottom-color:var(--red)}
+.weekhome:active{opacity:.65}

@@ -680,8 +680,40 @@ async function loadWeek(delta) {
     $("#nextWeek").disabled = false;
   }
 }
+async function goThisWeek() {
+  if (weekBusy) return;
+  weekBusy = true;
+  $("#prevWeek").disabled = true;
+  $("#nextWeek").disabled = true;
+  $("#btnThisWeek").disabled = true;
+  try {
+    const today = ymd(new Date());
+    let local = state.data && state.data.schedule;
+    // 优先回到上次刷新得到的“本周”数据；跨周时再基于整学期课表计算
+    if (!local || local.start > today || local.end < today) {
+      local = computeWeek(new Date());
+    }
+    if (!local) {
+      toast("本地还没有整学期课表，请点「更多 → 刷新数据」更新一次");
+      return;
+    }
+    const start = new Date(local.start + "T00:00:00");
+    const idx = Math.round((new Date(today + "T00:00:00") - start) / 86400000);
+    state.selectedDay = idx >= 0 && idx < 7 ? idx : new Date().getDay();
+    renderSchedule(local);
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    weekBusy = false;
+    $("#prevWeek").disabled = false;
+    $("#nextWeek").disabled = false;
+    $("#btnThisWeek").disabled = false;
+  }
+}
+
 $("#prevWeek").addEventListener("click", () => loadWeek(-1));
 $("#nextWeek").addEventListener("click", () => loadWeek(1));
+$("#btnThisWeek").addEventListener("click", goThisWeek);
 
 /* ---------------- 考试 ---------------- */
 function examParts(x) {
