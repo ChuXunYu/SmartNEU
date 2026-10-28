@@ -918,3 +918,10 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
   font:14px var(--sans);color:var(--ink);letter-spacing:1px}
 .passsheet .field input:focus{border-color:var(--ink)}
 .passsheet .btn-primary{margin-bottom:8px}
+
+/* 网费充值：从标题角落移到核心余额下方 */
+.netpay{display:block;width:100%;border:0;background:var(--ink);color:var(--paper);cursor:pointer;
+  margin:15px 0 3px;padding:15px;font-family:var(--serif);font-size:15px;letter-spacing:5px;
+  transition:background .15s}
+.netpay:active{background:var(--red-deep)}
+.netpay:focus-visible{outline:2px solid var(--red);outline-offset:2px}
