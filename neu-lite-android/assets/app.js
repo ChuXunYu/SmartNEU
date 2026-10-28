@@ -8,6 +8,8 @@ const state = {
   selectedDay: null,
   schedule: null,
   tab: "schedule",
+  mailDetails: {},
+  mailPrefetching: new Set(),
   view: (() => { try { return localStorage.getItem("neu.schedule.view") || "week"; } catch { return "week"; } })(),
 };
 
@@ -139,12 +141,21 @@ function saveCache(d) {
       copy.mail = Object.assign({}, copy.mail);
       delete copy.mail.web_url;
     }
+    const details = {};
+    Object.keys(state.mailDetails || {}).forEach((id) => {
+      const one = Object.assign({}, state.mailDetails[id]);
+      delete one.web_url;
+      details[id] = one;
+    });
+    copy.mail_details = details;
     localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: copy }));
   } catch {}
 }
 function clearCache() {
   try { localStorage.removeItem(CACHE_KEY); } catch {}
   clearCardCache();
+  state.mailDetails = {};
+  state.mailPrefetching = new Set();
 }
 function setUpdated(ts) {
   const el = $("#updatedAt");
@@ -218,12 +229,7 @@ async function refresh() {
     setTimeout(loadIpwg, 500);
     mailTask.then((mail) => {
       if (!mail || myId !== refreshId || !state.data) return;
-      const unread = mail.portal_unread ?? mail.unread;
-      state.data.mail = mail;
-      state.data.mail_unread = unread;
-      saveCache(state.data);
-      renderMailBadge(unread);
-      if (!$("#mailView").classList.contains("hidden")) renderMail(mail);
+      attachMail(mail);
     });
   } catch (e) {
     if (myId !== refreshId) return;
@@ -271,6 +277,7 @@ async function boot() {
   if (cache) {
     // 秒开：先用上次成功刷新的数据渲染，不发起网络请求
     state.data = cache.data;
+    state.mailDetails = cache.data.mail_details || {};
     renderAll(cache.data);
     renderStats(state.tab, false);
     setUpdated(cache.at);
@@ -1219,6 +1226,7 @@ let cardFetchedAt = 0;
 let cardWarmPromise = null;
 let mailLoading = false;
 let mailWebUrl = "";
+let mailDetailCurrentId = "";
 let payTarget = "card";
 let payPollTimer = null;
 
@@ -1421,10 +1429,57 @@ function renderMail(data) {
   }));
 }
 
+function attachMail(mail) {
+  state.data = state.data || {};
+  state.data.mail = mail;
+  state.data.mail_unread = mail.portal_unread ?? mail.unread;
+  saveCache(state.data);
+  renderMailBadge(state.data.mail_unread);
+  if (!$("#mailView").classList.contains("hidden")) renderMail(mail);
+  prefetchMailDetails(mail.items || []);
+}
+
+async function prefetchMailDetails(items) {
+  const queue = (items || []).filter((x) => x.id
+    && !(state.mailDetails[x.id] && state.mailDetails[x.id].status === "ok")
+    && !state.mailPrefetching.has(x.id));
+  if (!queue.length) return;
+  queue.forEach((x) => state.mailPrefetching.add(x.id));
+  const worker = async () => {
+    while (queue.length) {
+      const it = queue.shift();
+      try {
+        const d = await api(`/api/mail/detail?id=${encodeURIComponent(it.id)}`);
+        if (d && d.status === "ok") {
+          state.mailDetails[it.id] = d;
+          saveCache(state.data);
+          if (mailDetailCurrentId === it.id) renderMailDetail(d);
+        }
+      } catch (e) {
+        // 单封邮件失败不影响其他邮件，点开时再重试
+      } finally {
+        state.mailPrefetching.delete(it.id);
+      }
+    }
+  };
+  const n = Math.min(3, queue.length);
+  await Promise.all(Array.from({ length: n }, () => worker()));
+}
+
+function renderMailDetail(d) {
+  $("#mailDetailHead").innerHTML = `<div class="subject">${esc(d.subject || "(无主题)")}</div>
+    <div class="meta">${esc(d.from || "")}<br>${esc(d.date || "")}</div>`;
+  $("#mailBody").textContent = d.text || "（正文为空）";
+  const atts = d.attachments || [];
+  $("#mailAttach").textContent = atts.length ? "附件：" + atts.join(" · ") : "";
+  if (d.web_url) mailWebUrl = d.web_url;
+}
+
 async function loadMail(force = false) {
   const cached = state.data && state.data.mail;
   if (cached && !force) {
     renderMail(cached);
+    prefetchMailDetails(cached.items || []);
     return;
   }
   if (mailLoading) return;
@@ -1437,11 +1492,7 @@ async function loadMail(force = false) {
   }
   try {
     const d = await api("/api/mail");
-    state.data = state.data || {};
-    state.data.mail = d;
-    state.data.mail_unread = d.portal_unread ?? d.unread;
-    saveCache(state.data);
-    renderMail(d);
+    attachMail(d);
     if (d.status === "partial") toast(d.error || "邮箱读取失败");
   } catch (e) {
     if (!cached) $("#mailList").innerHTML = `<div class="empty">${esc(e.message || "邮箱读取失败")}</div>`;
@@ -1452,19 +1503,22 @@ async function loadMail(force = false) {
 }
 
 async function openMailDetail(id) {
+  mailDetailCurrentId = id;
   $("#mailDetailView").classList.remove("hidden");
+  const cached = state.mailDetails[id];
+  if (cached && cached.status === "ok") {
+    renderMailDetail(cached);
+    return;
+  }
   $("#mailDetailHead").innerHTML = `<div class="subject">正在读取邮件…</div>`;
   $("#mailBody").textContent = "";
   $("#mailAttach").textContent = "";
   try {
     const d = await api(`/api/mail/detail?id=${encodeURIComponent(id)}`);
     if (d.status !== "ok") throw new Error(d.error || "邮件读取失败");
-    $("#mailDetailHead").innerHTML = `<div class="subject">${esc(d.subject || "(无主题)")}</div>
-      <div class="meta">${esc(d.from || "")}<br>${esc(d.date || "")}</div>`;
-    $("#mailBody").textContent = d.text || "（正文为空）";
-    const atts = d.attachments || [];
-    $("#mailAttach").textContent = atts.length ? "附件：" + atts.join(" · ") : "";
-    mailWebUrl = d.web_url || mailWebUrl;
+    state.mailDetails[id] = d;
+    saveCache(state.data);
+    renderMailDetail(d);
   } catch (e) {
     $("#mailDetailHead").innerHTML = `<div class="subject">邮件读取失败</div>`;
     $("#mailBody").textContent = e.message;
@@ -1473,6 +1527,7 @@ async function openMailDetail(id) {
 
 function closeMailDetail() {
   $("#mailDetailView").classList.add("hidden");
+  mailDetailCurrentId = "";
 }
 
 function openMail() {

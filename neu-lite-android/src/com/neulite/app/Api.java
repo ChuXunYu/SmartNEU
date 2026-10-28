@@ -832,10 +832,18 @@ public class Api {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] b = s.getBytes(StandardCharsets.US_ASCII);
             for (int i = 0; i < b.length; i++) {
-                if (b[i] == '=' && i + 2 < b.length) {
-                    int hi = Character.digit((char) b[i + 1], 16);
-                    int lo = Character.digit((char) b[i + 2], 16);
-                    if (hi >= 0 && lo >= 0) { out.write((hi << 4) | lo); i += 2; continue; }
+                if (b[i] == '=') {
+                    // quoted-printable 软换行处理
+                    if (i + 1 < b.length && (b[i + 1] == '\r' || b[i + 1] == '\n')) {
+                        i++;
+                        if (b[i] == '\r' && i + 1 < b.length && b[i + 1] == '\n') i++;
+                        continue;
+                    }
+                    if (i + 2 < b.length) {
+                        int hi = Character.digit((char) b[i + 1], 16);
+                        int lo = Character.digit((char) b[i + 2], 16);
+                        if (hi >= 0 && lo >= 0) { out.write((hi << 4) | lo); i += 2; continue; }
+                    }
                 }
                 out.write(b[i] == '_' && underscoreSpace ? ' ' : b[i]);
             }
@@ -1040,6 +1048,27 @@ public class Api {
         try { return Long.parseLong(m.group(1).trim()); } catch (Exception e) { return 0; }
     }
 
+    static String decodeUtf8Strict(byte[] bytes) {
+        try {
+            CharsetDecoder dec = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT);
+            return dec.decode(ByteBuffer.wrap(bytes)).toString();
+        } catch (Exception e) { return null; }
+    }
+
+    static boolean plausibleText(String s) {
+        if (s == null || s.isEmpty() || s.indexOf('\uFFFD') >= 0) return false;
+        int bad = 0, total = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (ch == '\r' || ch == '\n' || ch == '\t') continue;
+            total++;
+            if (Character.isISOControl(ch)) bad++;
+        }
+        return total > 0 && bad * 10 <= total;
+    }
+
     static String decodeBytesBest(byte[] bytes, String preferred) {
         String[] names = {preferred, "UTF-8", "GB18030", "GBK"};
         for (String name : names) {
@@ -1062,10 +1091,18 @@ public class Api {
         String ascii = new String(bytes, StandardCharsets.ISO_8859_1);
         String compact = ascii.replaceAll("\\s", "");
         String trimmed = ascii.trim();
-        if (compact.length() >= 32 && compact.length() % 4 == 0
+        if (compact.length() >= 4 && compact.length() % 4 == 0
                 && trimmed.matches("[A-Za-z0-9+/=\\r\\n]+")) {
             try {
-                return decodeBytesBest(Base64.decode(compact, Base64.DEFAULT), cs);
+                byte[] decoded = Base64.decode(compact, Base64.DEFAULT);
+                String strict = decodeUtf8Strict(decoded);
+                if (strict != null && plausibleText(strict)) {
+                    return strict;
+                }
+                if (compact.length() >= 32) {
+                    String guessed = decodeBytesBest(decoded, cs);
+                    if (plausibleText(guessed)) return guessed;
+                }
             } catch (Exception ignored) {}
         }
         if (ascii.matches("(?s).*=[0-9A-Fa-f]{2}.*")) {
@@ -1091,23 +1128,41 @@ public class Api {
         put(out, "date", xmlField(meta, "date", "sentDate"));
         String textBlock = xmlObjectBlock(meta, "text");
         String htmlBlock = xmlObjectBlock(meta, "html");
-        String useBlock = xmlLong(textBlock, "contentLength") > 0 ? textBlock : htmlBlock;
+        long textLen = xmlLong(textBlock, "contentLength");
+        long htmlLen = xmlLong(htmlBlock, "contentLength");
         String text = "";
-        String ctype = xmlField(useBlock, "string", "contentType");
-        long off = xmlLong(useBlock, "contentOffset");
-        long len = xmlLong(useBlock, "contentLength");
-        if (len > 0) {
+        String ctype = "";
+        byte[] raw = null;
+        if (textLen > 0 || htmlLen > 0) {
             String rawUrl = apiBase + "?sid=" + URLEncoder.encode(sid, "UTF-8")
                     + "&func=mbox:getMessageData&mid=" + URLEncoder.encode(mid, "UTF-8");
-            byte[] raw = httpGetBytes(rawUrl, sso[0]);
-            if (off >= 0 && off + len <= raw.length) {
+            raw = httpGetBytes(rawUrl, sso[0]);
+        }
+        if (raw != null && textLen > 0) {
+            long off = xmlLong(textBlock, "contentOffset");
+            if (off >= 0 && off + textLen <= raw.length) {
+                ctype = xmlField(textBlock, "string", "contentType");
                 String cs = paramValue(ctype, "charset");
                 if (cs.isEmpty()) cs = "UTF-8";
-                text = decodeMailBody(raw, (int) off, (int) len, cs);
+                text = decodeMailBody(raw, (int) off, (int) textLen, cs);
+            }
+        }
+        // 纯文本为空或只有空白时，退回 HTML 正文
+        if (raw != null && htmlLen > 0 && text.trim().isEmpty()) {
+            long hoff = xmlLong(htmlBlock, "contentOffset");
+            if (hoff >= 0 && hoff + htmlLen <= raw.length) {
+                ctype = xmlField(htmlBlock, "string", "contentType");
+                String cs = paramValue(ctype, "charset");
+                if (cs.isEmpty()) cs = "UTF-8";
+                text = decodeMailBody(raw, (int) hoff, (int) htmlLen, cs);
             }
         }
         if (ctype.toLowerCase(Locale.US).contains("text/html")) {
-            try { text = Html.fromHtml(text).toString(); } catch (Exception ignored) {}
+            try {
+                text = text.replaceAll("(?is)<style.*?</style>", " ")
+                        .replaceAll("(?is)<script.*?</script>", " ");
+                text = Html.fromHtml(text).toString();
+            } catch (Exception ignored) {}
         }
         if (text.length() > 120000) text = text.substring(0, 120000);
         put(out, "text", text);
