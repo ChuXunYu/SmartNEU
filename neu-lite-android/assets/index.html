@@ -207,6 +207,21 @@
   <div id="mailList" class="maillist"></div>
 </div>
 
+<div id="composeMask" class="sheetmask hidden">
+  <div class="sheet composesheet">
+    <div class="sheet-title">写信</div>
+    <p class="composehint">使用校园邮箱的「客户端专用密码」，不是统一认证密码。密码只用于本次发送，不保存。</p>
+    <div class="field"><input id="composeFrom" autocomplete="email" placeholder="发件邮箱，如 zhangz5@mails.neu.edu.cn"></div>
+    <div class="field"><input id="composePassword" type="password" autocomplete="new-password" placeholder="客户端专用密码"></div>
+    <div class="field"><input id="composeTo" autocomplete="email" placeholder="收件人邮箱"></div>
+    <div class="field"><input id="composeSubject" placeholder="主题"></div>
+    <textarea id="composeBody" placeholder="正文"></textarea>
+    <button id="composeSend" class="btn-primary" type="button">发送</button>
+    <button id="composeCancel" class="btn-switch" type="button">取消</button>
+    <p id="composeMsg" class="msg"></p>
+  </div>
+</div>
+
 <div id="passMask" class="sheetmask hidden">
   <div class="sheet passsheet">
     <div class="sheet-title" id="passTitle">加密密码</div>

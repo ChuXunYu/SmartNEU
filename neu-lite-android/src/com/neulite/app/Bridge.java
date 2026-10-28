@@ -55,7 +55,8 @@ public class Bridge {
     public void callAsync(String action, String payload, String id) {
         final JSONObject p = parse(payload);
         final String requestId = id == null ? "" : id;
-        ExecutorService target = ("mail".equals(action) || "mailDetail".equals(action)) ? mailWorker : worker;
+        ExecutorService target = ("mail".equals(action) || "mailDetail".equals(action)
+                || "sendMail".equals(action)) ? mailWorker : worker;
         target.execute(() -> {
             String out;
             try {
@@ -135,6 +136,10 @@ public class Bridge {
                 return api.mailInfo().toString();
             case "mailDetail":
                 return api.mailDetail(p.optString("id")).toString();
+            case "sendMail":
+                SmtpClient.send(p.optString("from"), p.optString("password"),
+                        p.optString("to"), p.optString("subject"), p.optString("body"));
+                return "{\"status\":\"ok\"}";
             case "payCard":
                 return api.createCardOrder(p.optDouble("amount", 0)).toString();
             case "payNet":

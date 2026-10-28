@@ -938,3 +938,13 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 
 .mailhead .mailactions{display:flex;align-items:center;gap:14px}
 .mailhead .mailactions .textbtn{margin:0}
+
+/* 原生 SMTP 写信 */
+.composesheet .composehint{font-size:9px;line-height:1.75;color:var(--muted);margin:0 0 12px}
+.composesheet .field{margin-bottom:8px}
+.composesheet .field input{width:100%;border:1px solid var(--line);padding:10px;outline:0;background:transparent;
+  font:13px var(--sans);color:var(--ink);letter-spacing:.2px}
+.composesheet #composeBody{width:100%;height:150px;border:1px solid var(--line);padding:10px;outline:0;
+  background:transparent;color:var(--ink);font:13px/1.7 var(--sans);resize:none;margin-bottom:12px}
+.composesheet .field input:focus,.composesheet #composeBody:focus{border-color:var(--ink)}
+.composesheet .btn-primary{margin-bottom:8px}

@@ -100,6 +100,10 @@ async function nativeApi(path, opts = {}) {
     case "/api/card/qr": return nativeCallAsync("cardQr");
     case "/api/mail": return nativeCallAsync("mail");
     case "/api/mail/detail": return nativeCallAsync("mailDetail", { id: params.get("id") || "" });
+    case "/api/mail/send": {
+      const b = JSON.parse(opts.body || "{}");
+      return nativeCallAsync("sendMail", b);
+    }
     case "/api/pay/card": return nativeCallAsync("payCard", body);
     case "/api/pay/net": return nativeCallAsync("payNet", body);
     case "/api/pay/order": return nativeCallAsync("payOrder", { order_no: params.get("order_no") || "" });
@@ -1720,7 +1724,7 @@ function openMail() {
   loadMail();
 }
 
-async function composeMail() {
+async function openWebCompose() {
   let url = mailWebUrl;
   if (!url) {
     try {
@@ -1738,6 +1742,53 @@ async function composeMail() {
   }
   const base = url.split("#")[0];
   openUrlSafe(base + "#mail.compose", "写信");
+}
+
+function openCompose() {
+  if (!window.NEU) {
+    toast("桌面端请使用网页邮箱写信");
+    return;
+  }
+  let from = "";
+  try { from = localStorage.getItem("neu.mail.from") || ""; } catch {}
+  $("#composeFrom").value = from;
+  $("#composePassword").value = "";
+  $("#composeTo").value = "";
+  $("#composeSubject").value = "";
+  $("#composeBody").value = "";
+  $("#composeMsg").textContent = "";
+  $("#composeSend").disabled = false;
+  $("#composeMask").classList.remove("hidden");
+  setTimeout(() => $("#composeFrom").focus(), 80);
+}
+
+function closeCompose() {
+  $("#composeMask").classList.add("hidden");
+  $("#composePassword").value = "";
+}
+
+async function sendCompose() {
+  const from = $("#composeFrom").value.trim();
+  const password = $("#composePassword").value;
+  const to = $("#composeTo").value.trim();
+  const subject = $("#composeSubject").value.trim();
+  const body = $("#composeBody").value;
+  if (!from || !from.includes("@")) return $("#composeMsg").textContent = "请填写正确的发件邮箱";
+  if (!password) return $("#composeMsg").textContent = "请填写客户端专用密码";
+  if (!to || !to.includes("@")) return $("#composeMsg").textContent = "请填写收件人邮箱";
+  const btn = $("#composeSend");
+  btn.disabled = true;
+  $("#composeMsg").textContent = "正在通过 SMTP 发送…";
+  try {
+    await api("/api/mail/send", { method: "POST", body: JSON.stringify({ from, password, to, subject, body }) });
+    try { localStorage.setItem("neu.mail.from", from); } catch {}
+    toast("邮件已发送");
+    closeCompose();
+  } catch (e) {
+    $("#composeMsg").textContent = "发送失败：" + e.message;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function closeMail() {
@@ -1827,7 +1878,10 @@ $("#mailBack").addEventListener("click", closeMail);
 $("#mailDetailBack").addEventListener("click", closeMailDetail);
 $("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
 $("#mailRefresh").addEventListener("click", () => loadMail(true));
-$("#mailCompose").addEventListener("click", composeMail);
+$("#mailCompose").addEventListener("click", openCompose);
+$("#composeCancel").addEventListener("click", closeCompose);
+$("#composeSend").addEventListener("click", sendCompose);
+$("#composeMask").addEventListener("click", (e) => { if (e.target === $("#composeMask")) closeCompose(); });
 
 /* ---------------- 标签页 ---------------- */
 function activateTab(name) {
