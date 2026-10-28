@@ -864,13 +864,20 @@ body.card-mode #panel-card .section-head{margin:10px 0 8px}
 .pastgroup .exam{opacity:.62}
 
 /* 课表/考试页顶部恢复一点呼吸感 */
-body.roomy-top .masthead{padding-top:10px}
-body.roomy-top .hello{margin:9px 0 8px}
+body.roomy-top .masthead{padding-top:12px}
+body.roomy-top .hello{margin:10px 0 9px}
 body.roomy-top h1#greet{margin:3px 0 3px}
-body.roomy-top .ledger{padding:9px 22px}
-body.roomy-top .updated{padding:4px 22px 5px}
+body.roomy-top .ledger{padding:10px 22px}
+body.roomy-top .updated{padding:5px 22px 6px}
 body.roomy-top #panel-schedule .section-head,
-body.roomy-top #panel-exams .section-head{margin:12px 0 9px;padding-bottom:7px}
+body.roomy-top #panel-exams .section-head{margin:14px 0 10px;padding-bottom:8px}
+body.roomy-top #panel-schedule .weekcard{padding-top:20px}
+body.roomy-top #panel-schedule .daystrip{margin-top:16px}
+body.roomy-top #panel-schedule .dayhead{margin-top:26px}
+body.roomy-top #panel-schedule .wdbody{padding-top:11px;padding-bottom:12px}
+body.roomy-top #panel-schedule .wdev{padding:7px 0}
+body.roomy-top #panel-schedule .slot{padding-top:19px;padding-bottom:19px}
+body.roomy-top #panel-schedule .examup{margin-top:10px}
 
 .qrloading{display:flex;align-items:center;justify-content:center;gap:8px;height:100%;color:var(--muted);
   font-size:10px;letter-spacing:.8px}
