@@ -95,6 +95,7 @@ async function nativeApi(path, opts = {}) {
     case "/api/net": return nativeCallAsync("net");
     case "/api/ipgw": return nativeCallAsync("ipgw");
     case "/api/card": return nativeCallAsync("card");
+    case "/api/card/qr": return nativeCallAsync("cardQr");
     case "/api/mail": return nativeCallAsync("mail");
     case "/api/mail/detail": return nativeCallAsync("mailDetail", { id: params.get("id") || "" });
     case "/api/pay/card": return nativeCallAsync("payCard", body);
@@ -136,6 +137,7 @@ function saveCache(d) {
 }
 function clearCache() {
   try { localStorage.removeItem(CACHE_KEY); } catch {}
+  clearCardCache();
 }
 function setUpdated(ts) {
   const el = $("#updatedAt");
@@ -249,6 +251,7 @@ async function boot() {
     renderAll(cache.data);
     renderStats(state.tab, false);
     setUpdated(cache.at);
+    setTimeout(warmCard, 500);
     return;
   }
   // 首次安装：先用本地资料占位，再拉一次
@@ -261,6 +264,7 @@ async function boot() {
   });
   showSkeleton();
   await refresh();
+  setTimeout(warmCard, 300);
 }
 
 function greeting() {
@@ -912,13 +916,6 @@ function exportCsv(kind) {
 }
 
 /* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
-let qrTimer = null;
-let cardLoading = false;
-let mailLoading = false;
-let mailWebUrl = "";
-let payTarget = "card";
-let payPollTimer = null;
-
 function openUrlSafe(url) {
   if (!url) return;
   if (window.NEU) {
@@ -927,6 +924,25 @@ function openUrlSafe(url) {
   } else {
     window.open(url, "_blank", "noopener");
   }
+}
+
+async function warmCard() {
+  if (!state.session || !state.session.logged_in) return;
+  if (cardWarmPromise) return cardWarmPromise;
+  cardWarmPromise = (async () => {
+    try {
+      const d = await api("/api/card");
+      state.card = d;
+      cardFetchedAt = Date.now();
+      saveCardCache(d);
+      if (state.tab === "card") renderCard(d);
+    } catch (e) {
+      // 后台预热失败不打扰，页面打开时再重试
+    } finally {
+      cardWarmPromise = null;
+    }
+  })();
+  return cardWarmPromise;
 }
 
 function renderMailBadge(n) {
@@ -941,80 +957,157 @@ function renderMailBadge(n) {
   }
 }
 
-function stopQr() {
-  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+const CARD_CACHE_KEY = "neu.card.v1";
+let qrTimer = null;
+let qrExpires = 0;
+let qrRefreshing = false;
+let cardLoading = false;
+let cardFetchedAt = 0;
+let cardWarmPromise = null;
+let mailLoading = false;
+let mailWebUrl = "";
+let payTarget = "card";
+let payPollTimer = null;
+
+function loadCardCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CARD_CACHE_KEY) || "null");
+    return c && c.data ? c.data : null;
+  } catch { return null; }
+}
+function saveCardCache(d) {
+  try { localStorage.setItem(CARD_CACHE_KEY, JSON.stringify({ at: Date.now(), data: d })); } catch {}
+}
+function clearCardCache() {
+  try { localStorage.removeItem(CARD_CACHE_KEY); } catch {}
 }
 
-function startQr(qr) {
-  stopQr();
+function stopQr() {
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+  qrRefreshing = false;
+}
+
+function drawQr(code) {
   const box = $("#cardQr");
-  const code = qr.code || "";
-  if (!code || !window.qrcode) {
-    box.innerHTML = `<div class="qrfail">二维码暂不可用</div>`;
-    return;
-  }
+  if (!box || !code || !window.qrcode) return false;
   try {
     const g = qrcode(0, "M");
     g.addData(code);
     g.make();
     box.innerHTML = g.createSvgTag({ cellSize: 4, margin: 0 });
+    return true;
   } catch (e) {
-    box.innerHTML = `<div class="qrfail">二维码生成失败</div>`;
-    return;
+    return false;
   }
-  const expires = Number(qr.expires_at || 0);
-  const tick = () => {
-    const left = expires ? Math.max(0, Math.ceil((expires - Date.now()) / 1000)) : 10;
-    const el = $("#qrTime");
-    if (el) el.textContent = left > 0 ? `${left} 秒后刷新` : "正在刷新…";
-    if (left <= 0) {
-      stopQr();
-      loadCard(true);
-    }
-  };
-  tick();
-  qrTimer = setInterval(tick, 1000);
 }
 
-function renderCard(d) {
+function ensureQrShell(d) {
+  if (document.querySelector("#cardQr")) return;
+  $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div>
+    <div id="cardQr"></div>
+    <div class="qrtime" id="qrTime">—</div>
+    <div class="qrvalid" id="qrValid"></div>
+    <div class="qrgate" id="qrGate"></div>`;
+  $("#qrValid").textContent = d.valid_until ? "虚拟卡有效期至 " + d.valid_until : "e码通虚拟卡";
+}
+
+function applyQr(qr, d) {
+  if (!qr || !qr.code) return false;
+  ensureQrShell(d || {});
+  if (!drawQr(qr.code)) return false;
+  qrExpires = Number(qr.expires_at) || (Date.now() + 10000);
+  $("#qrValid").textContent = d && d.valid_until ? "虚拟卡有效期至 " + d.valid_until : "e码通虚拟卡";
+  const gate = (d && d.gate) || {};
+  $("#qrGate").textContent = gate.name || "";
+  startQrTimer();
+  return true;
+}
+
+function startQrTimer() {
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+  const tick = () => {
+    const left = Math.max(0, Math.ceil((qrExpires - Date.now()) / 1000));
+    const el = $("#qrTime");
+    if (el) el.textContent = qrRefreshing ? "正在刷新…" : (left > 0 ? `${left} 秒后刷新` : "正在刷新…");
+    if (left <= 2 && !qrRefreshing) refreshQr();
+  };
+  tick();
+  qrTimer = setInterval(tick, 250);
+}
+
+async function refreshQr() {
+  if (qrRefreshing) return;
+  qrRefreshing = true;
+  try {
+    const q = await api("/api/card/qr");
+    if (q.status !== "ok" || !q.qr || !q.qr.code) throw new Error(q.error || "二维码刷新失败");
+    state.card = Object.assign({}, state.card || {}, q);
+    saveCardCache(state.card);
+    if (!applyQr(q.qr, state.card)) throw new Error("二维码生成失败");
+  } catch (e) {
+    // 保留旧二维码，稍后重试，不出现白屏/空白
+    qrExpires = Date.now() + 2000;
+    const el = $("#qrTime");
+    if (el) el.textContent = "刷新失败，正在重试";
+  } finally {
+    qrRefreshing = false;
+  }
+}
+
+function renderCard(d, cached = false) {
   const bal = d.balance != null && d.balance !== "" ? esc(d.balance) : "—";
   const unit = esc(d.unit || "元");
   const name = esc(d.name || "同学");
   const sid = esc(d.student_id || "");
-  const gate = d.gate || {};
   $("#cardStatus").textContent = d.status === "ok" ? "正常卡" : "部分数据";
   $("#cardHero").innerHTML = `<div class="cardwho"><b>${name}</b><span>${sid ? "学号 " + sid : ""}</span></div>
     <div class="cardbal"><b>${bal}</b><span>${unit}</span></div>
     <div class="cardsub"><span>校园卡余额</span><span>${d.valid_until ? "有效期至 " + esc(d.valid_until) : ""}</span></div>`;
   if (d.qr && d.qr.code) {
-    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div>
-      <div id="cardQr"></div>
-      <div class="qrtime" id="qrTime">—</div>
-      <div class="qrvalid">${d.valid_until ? "虚拟卡有效期至 " + esc(d.valid_until) : "e码通虚拟卡"}</div>
-      ${gate.name ? `<div class="qrgate">${esc(gate.name)}</div>` : ""}`;
-    startQr(d.qr);
-  } else {
-    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div>
-      <div class="qrfail">${esc(d.qr_error || "暂时无法获取二维码，请稍后重试")}</div>`;
+    ensureQrShell(d);
+    applyQr(d.qr, d);
+  } else if (!document.querySelector("#cardQr svg")) {
+    ensureQrShell(d);
+    $("#cardQr").innerHTML = `<div class="qrfail">${esc(d.qr_error || "暂时无法获取二维码")}</div>`;
+    $("#qrValid").textContent = d.valid_until ? "虚拟卡有效期至 " + d.valid_until : "e码通虚拟卡";
   }
 }
 
-async function loadCard(force = false) {
-  if (cardLoading) return;
-  cardLoading = true;
-  if (force || !state.card) {
+async function loadCard() {
+  let cached = state.card || loadCardCache();
+  if (!cached && cardWarmPromise) {
+    try { await cardWarmPromise; } catch {}
+    cached = state.card;
+  }
+  if (cached) {
+    state.card = cached;
+    renderCard(cached, true);
+  } else if (state.data && state.data.card_balance != null) {
+    $("#cardStatus").textContent = "正在更新";
+    $("#cardHero").innerHTML = `<div class="cardwho"><b>校园卡</b><span></span></div>
+      <div class="cardbal"><b>${esc(state.data.card_balance)}</b><span>${esc(state.data.card_unit || "元")}</span></div>
+      <div class="cardsub"><span>校园卡余额</span><span></span></div>`;
+    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">正在获取通行码…</div>`;
+  } else {
     $("#cardHero").innerHTML = `<div class="cardwho"><b>正在读取校园卡</b><span></span></div>
       <div class="cardbal"><b>—</b><span>元</span></div>`;
-    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">正在获取二维码…</div>`;
+    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">正在获取通行码…</div>`;
   }
+  if (cached && Date.now() - cardFetchedAt < 15000) return;
+  if (cardLoading) return;
+  cardLoading = true;
   try {
     const d = await api("/api/card");
     state.card = d;
+    cardFetchedAt = Date.now();
+    saveCardCache(d);
     renderCard(d);
     if (d.status !== "ok") toast(d.qr_error || "校园卡部分数据读取失败");
   } catch (e) {
-    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">${esc(e.message || "读取失败")}</div>`;
-    toast("校园卡读取失败：" + e.message);
+    if (!cached) {
+      $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">${esc(e.message || "读取失败")}</div>`;
+      toast("校园卡读取失败：" + e.message);
+    }
   } finally {
     cardLoading = false;
   }

@@ -113,6 +113,21 @@ class Ctx:
         out["updated_at"] = int(dt.datetime.now().timestamp() * 1000)
         return out
 
+    def card_qr(self) -> dict:
+        if self.demo:
+            d = mock.card_info()
+            return {"status": "ok", "qr": d.get("qr"), "valid_until": d.get("valid_until"),
+                    "gate": d.get("gate")}
+        try:
+            ec = ecode.fetch(self.sess)
+            return {"status": "ok", "qr": ec.get("qr"), "valid_until": ec.get("valid_until"),
+                    "gate": ec.get("gate")}
+        except Exception as e:
+            msg = str(e)
+            if "登录失败" in msg:
+                msg = "登录已失效，请重新登录后刷新"
+            return {"status": "error", "error": msg}
+
     def mail_info(self) -> dict:
         if self.demo:
             return mock.mail_info()
@@ -325,6 +340,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(self.ctx.ipgw_usage())
                 if p == "/api/card":
                     return self._json(self.ctx.card_info())
+                if p == "/api/card/qr":
+                    return self._json(self.ctx.card_qr())
                 if p == "/api/mail":
                     return self._json(self.ctx.mail_info())
                 if p == "/api/mail/detail":

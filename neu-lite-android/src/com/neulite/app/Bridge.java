@@ -126,6 +126,8 @@ public class Bridge {
                 return api.overview(p.optBoolean("probe")).toString();
             case "card":
                 return api.cardInfo().toString();
+            case "cardQr":
+                return api.cardQr().toString();
             case "mail":
                 return api.mailInfo().toString();
             case "mailDetail":

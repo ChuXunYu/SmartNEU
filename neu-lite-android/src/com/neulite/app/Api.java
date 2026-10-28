@@ -769,6 +769,43 @@ public class Api {
         return out;
     }
 
+    public JSONObject cardQr() {
+        JSONObject out = new JSONObject();
+        put(out, "status", "ok");
+        try {
+            ecodeLogin();
+            JSONObject qr = ecodeGet("/api/qr-code");
+            JSONObject qa = firstAttr(qr);
+            if (qa != null) {
+                JSONObject q = new JSONObject();
+                put(q, "code", str(qa, "qrCode"));
+                put(q, "created_at", qa.optLong("createTime", 0));
+                put(q, "expires_at", qa.optLong("qrInvalidTime", 0));
+                put(out, "qr", q);
+            }
+            JSONObject ec = ecodeGet("/api/ecard-customer");
+            JSONObject ea = firstAttr(ec);
+            if (ea != null) put(out, "valid_until", str(ea, "noUseDate"));
+            JSONObject pr = ecodeGet("/api/user-priority");
+            JSONObject pa = firstAttr(pr);
+            JSONObject rules = pa == null ? null : pa.optJSONObject("ruleset");
+            JSONObject rd = rules == null ? null : rules.optJSONObject("data");
+            if (rd != null) {
+                JSONObject gate = new JSONObject();
+                put(gate, "name", str(rd, "name"));
+                put(gate, "color", str(rd, "color"));
+                put(gate, "result", str(rd, "result"));
+                put(out, "gate", gate);
+            }
+        } catch (Exception e) {
+            put(out, "status", "error");
+            String msg = e.getMessage();
+            if (msg != null && msg.contains("登录失败")) msg = "登录已失效，请重新登录后刷新";
+            put(out, "error", msg);
+        }
+        return out;
+    }
+
     private String queryParam(String url, String key) {
         try {
             String q = new URL(url).getQuery();
