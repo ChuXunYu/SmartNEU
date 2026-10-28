@@ -128,6 +128,43 @@ function withTimeout(promise, ms, message) {
   });
 }
 
+const CACHE_BUDGET = 2 * 1024 * 1024;
+const MAIL_DETAIL_MAX = 30;
+const MAIL_DETAIL_BUDGET = 1 * 1024 * 1024;
+
+function cacheTextSize(s) { return (s || "").length * 2; }
+
+function pruneMailDetails(items) {
+  const valid = new Set((items || []).map((x) => x.id));
+  const rows = [];
+  Object.keys(state.mailDetails || {}).forEach((id) => {
+    if (valid.size && !valid.has(id)) {
+      delete state.mailDetails[id];
+      return;
+    }
+    const one = state.mailDetails[id];
+    if (!one) return;
+    rows.push([id, one, cacheTextSize(JSON.stringify(one))]);
+  });
+  rows.sort((a, b) => (Number(b[1]._cachedAt) || 0) - (Number(a[1]._cachedAt) || 0));
+  const kept = {};
+  let total = 0;
+  rows.forEach(([id, one, size], i) => {
+    if (i >= MAIL_DETAIL_MAX || total + size > MAIL_DETAIL_BUDGET) return;
+    kept[id] = one;
+    total += size;
+  });
+  state.mailDetails = kept;
+}
+
+function updateCacheUsage() {
+  const el = $("#cacheUsage");
+  if (!el) return;
+  let chars = 0;
+  try { chars = (localStorage.getItem(CACHE_KEY) || "").length; } catch {}
+  el.textContent = `本地缓存 ${Math.round(chars * 2 / 1024)} KB / 上限 2 MB`;
+}
+
 function loadCache() {
   try {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
@@ -136,6 +173,7 @@ function loadCache() {
 }
 function saveCache(d) {
   try {
+    pruneMailDetails(d && d.mail && d.mail.items);
     const copy = Object.assign({}, d);
     if (copy.mail) {
       copy.mail = Object.assign({}, copy.mail);
@@ -148,8 +186,23 @@ function saveCache(d) {
       details[id] = one;
     });
     copy.mail_details = details;
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: copy }));
+    let str = JSON.stringify({ at: Date.now(), data: copy });
+    if (cacheTextSize(str) > CACHE_BUDGET) {
+      delete copy.mail_details;
+      str = JSON.stringify({ at: Date.now(), data: copy });
+    }
+    if (cacheTextSize(str) > CACHE_BUDGET && copy.mail && copy.mail.items) {
+      copy.mail.items = copy.mail.items.slice(0, 10);
+      str = JSON.stringify({ at: Date.now(), data: copy });
+    }
+    try {
+      localStorage.setItem(CACHE_KEY, str);
+    } catch (e) {
+      delete copy.mail_details;
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: copy }));
+    }
   } catch {}
+  updateCacheUsage();
 }
 function clearCache() {
   try { localStorage.removeItem(CACHE_KEY); } catch {}
@@ -280,6 +333,8 @@ async function boot() {
     // 秒开：先用上次成功刷新的数据渲染，不发起网络请求
     state.data = cache.data;
     state.mailDetails = cache.data.mail_details || {};
+    pruneMailDetails(cache.data.mail && cache.data.mail.items);
+    updateCacheUsage();
     renderAll(cache.data);
     renderStats(state.tab, false);
     setUpdated(cache.at);
@@ -1179,7 +1234,7 @@ async function doLogout() {
 
 /* ---------------- 更多面板 ---------------- */
 function closeSheet() { $("#sheetMask").classList.add("hidden"); }
-$("#btnMore").addEventListener("click", () => $("#sheetMask").classList.remove("hidden"));
+$("#btnMore").addEventListener("click", () => { updateCacheUsage(); $("#sheetMask").classList.remove("hidden"); });
 $("#sheetMask").addEventListener("click", (e) => { if (e.target === $("#sheetMask")) closeSheet(); });
 $("#linkJwxt").addEventListener("click", () => closeSheet());
 
@@ -1476,6 +1531,7 @@ function renderMail(data) {
 }
 
 function attachMail(mail, deferDetails = false) {
+  pruneMailDetails(mail.items || []);
   state.data = state.data || {};
   state.data.mail = mail;
   state.data.mail_unread = mail.portal_unread ?? mail.unread;
@@ -1498,7 +1554,9 @@ async function prefetchMailDetails(items) {
       try {
         const d = await api(`/api/mail/detail?id=${encodeURIComponent(it.id)}`);
         if (d && d.status === "ok") {
+          d._cachedAt = Date.now();
           state.mailDetails[it.id] = d;
+          pruneMailDetails(state.data && state.data.mail && state.data.mail.items);
           saveCache(state.data);
           if (mailDetailCurrentId === it.id) renderMailDetail(d);
         }
@@ -1563,7 +1621,9 @@ async function openMailDetail(id) {
   try {
     const d = await api(`/api/mail/detail?id=${encodeURIComponent(id)}`);
     if (d.status !== "ok") throw new Error(d.error || "邮件读取失败");
+    d._cachedAt = Date.now();
     state.mailDetails[id] = d;
+    pruneMailDetails(state.data && state.data.mail && state.data.mail.items);
     saveCache(state.data);
     renderMailDetail(d);
   } catch (e) {

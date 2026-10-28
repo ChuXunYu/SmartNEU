@@ -909,3 +909,4 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .filehint b{color:var(--ink);font-weight:500}
 .filetree{font-family:var(--mono,monospace);font-size:9px;line-height:1.8;color:var(--ink-2);
   background:var(--cream);border-left:2px solid var(--red);padding:8px 10px;margin-bottom:4px}
+.fileusage{font-size:8.5px;color:var(--muted);letter-spacing:.4px;margin:0 0 4px}

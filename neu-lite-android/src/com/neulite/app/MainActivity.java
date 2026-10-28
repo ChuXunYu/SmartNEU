@@ -1,6 +1,7 @@
 package com.neulite.app;
 
 import android.app.Activity;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.net.Uri;
@@ -10,6 +11,7 @@ import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.content.res.Configuration;
+import android.database.Cursor;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
@@ -25,6 +27,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +63,7 @@ public class MainActivity extends Activity {
         web.setBackgroundColor(paper);
         web.addJavascriptInterface(new Bridge(this, api), "NEU");
         setContentView(web);
+        trimWebCacheIfNeeded();
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -84,6 +88,27 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    private long dirSize(File f) {
+        if (f == null) return 0;
+        if (f.isFile()) return f.length();
+        long n = 0;
+        File[] list = f.listFiles();
+        if (list != null) for (File x : list) n += dirSize(x);
+        return n;
+    }
+
+    /** WebView 缓存超过 24MB 时自动清一次，避免长期浏览缴费/邮箱页累积。 */
+    private void trimWebCacheIfNeeded() {
+        new Thread(() -> {
+            long size = dirSize(getCacheDir());
+            File ext = getExternalCacheDir();
+            if (ext != null) size += dirSize(ext);
+            if (size > 24L * 1024 * 1024) {
+                runOnUiThread(() -> { if (web != null) web.clearCache(true); });
+            }
+        }).start();
     }
 
     // ------------------------------------------------------------ 状态导出
@@ -135,6 +160,7 @@ public class MainActivity extends Activity {
             ContentValues done = new ContentValues();
             done.put(MediaStore.Downloads.IS_PENDING, 0);
             getContentResolver().update(uri, done, null, null);
+            pruneExports(folder, base, 30);
             return "下载/neu-lite/" + folder + "/" + name;
         }
         File dir = new File(getExternalFilesDir(null), "exports/" + folder);
@@ -143,7 +169,46 @@ public class MainActivity extends Activity {
         try (FileOutputStream fos = new FileOutputStream(f)) {
             fos.write(data);
         }
+        pruneExports(folder, base, 30);
         return f.getAbsolutePath();
+    }
+
+    /** 每个用途最多保留最近 30 份导出，避免长期累积。 */
+    private void pruneExports(String folder, String base, int keep) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            String path = Environment.DIRECTORY_DOWNLOADS + "/neu-lite/" + folder + "%";
+            String[] proj = {MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME,
+                    MediaStore.Downloads.DATE_ADDED};
+            List<long[]> rows = new ArrayList<>();
+            try (Cursor c = getContentResolver().query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    proj, MediaStore.Downloads.RELATIVE_PATH + " LIKE ?", new String[]{path},
+                    MediaStore.Downloads.DATE_ADDED + " DESC")) {
+                if (c != null) {
+                    while (c.moveToNext()) {
+                        String name = c.getString(1);
+                        if (name != null && name.startsWith(base)) {
+                            rows.add(new long[]{c.getLong(0), c.getLong(2)});
+                        }
+                    }
+                }
+            }
+            if (rows.size() <= keep) return;
+            rows.sort(Comparator.comparingLong(a -> a[1]));
+            int remove = rows.size() - keep;
+            for (int i = 0; i < remove; i++) {
+                Uri u = ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, rows.get(i)[0]);
+                getContentResolver().delete(u, null, null);
+            }
+        } else {
+            File dir = new File(getExternalFilesDir(null), "exports/" + folder);
+            File[] files = dir.listFiles();
+            if (files == null) return;
+            List<File> list = new ArrayList<>();
+            for (File f : files) if (f.getName().startsWith(base)) list.add(f);
+            if (list.size() <= keep) return;
+            list.sort(Comparator.comparingLong(File::lastModified));
+            for (int i = 0; i < list.size() - keep; i++) list.get(i).delete();
+        }
     }
 
     /** 旧版把状态文件写在 Android/data/.../files/export，迁移完成后清理。 */

@@ -138,6 +138,7 @@ public class PaymentActivity extends Activity {
     protected void onDestroy() {
         if (web != null) {
             web.stopLoading();
+            web.clearCache(true);
             web.destroy();
             web = null;
         }
