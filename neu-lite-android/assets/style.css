@@ -925,3 +925,13 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
   transition:background .15s}
 .netpay:active{background:var(--red-deep)}
 .netpay:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+
+/* 邮箱：未读/已读分组 */
+.mailgroup-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:16px 0 2px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.mailgroup-head:first-child{margin-top:4px}
+.mailgroup-head span{font-family:var(--serif);font-size:11px;font-weight:600;letter-spacing:2px;color:var(--ink)}
+.mailgroup-head b{font-family:var(--serif);font-size:12px;font-weight:600;color:var(--red)}
+.mailgroup-head.read span{color:var(--muted)}
+.mailgroup-head.read b{color:var(--muted);font-weight:400}
+.mailnone{font-size:10px;color:var(--muted);letter-spacing:.4px;padding:14px 0;border-bottom:1px solid var(--line-soft)}

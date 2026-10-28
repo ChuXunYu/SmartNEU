@@ -225,7 +225,7 @@ function renderAll(d) {
   renderExams(d.exams);
   renderGrades(d.grades);
   renderNet(d.net);
-  renderMailBadge(d.mail?.portal_unread ?? d.mail?.unread ?? d.mail_unread);
+  renderMailBadge(d.mail ? (d.mail.unread ?? (d.mail.items || []).filter((x) => x.unread).length) : 0);
   if (d.mail && !$("#mailView").classList.contains("hidden")) renderMail(d.mail);
   if (d.session?.imei) $("#imei").textContent = `设备 ${d.session.imei}`;
 }
@@ -1556,34 +1556,46 @@ async function loadCard(force = false) {
 function renderMail(data) {
   const list = $("#mailList");
   const items = data.items || [];
-  const unread = data.portal_unread != null && data.portal_unread !== ""
-    ? data.portal_unread : data.unread;
-  renderMailBadge(unread != null ? unread : items.filter((x) => x.unread).length);
+  const unreadItems = items.filter((x) => x.unread);
+  const readItems = items.filter((x) => !x.unread);
+  const unread = unreadItems.length;
+  data.unread = unread;
+  renderMailBadge(unread);
   mailWebUrl = data.web_url || "";
   $("#mailMeta").textContent = data.status === "partial"
     ? "邮箱部分数据读取失败"
-    : `收件箱 ${items.length} 封 · 未读 ${unread != null ? unread : 0} 封`;
+    : `收件箱 ${items.length} 封 · 未读 ${unread} 封`;
   if (!items.length) {
     list.innerHTML = `<div class="empty">${data.error ? esc(data.error) : "收件箱为空"}</div>`;
     return;
   }
-  list.innerHTML = items.map((x) => `<div class="mailitem ${x.unread ? "unread" : ""}" data-url="${esc(mailWebUrl)}" data-id="${esc(x.id)}">
+  const row = (x) => `<div class="mailitem ${x.unread ? "unread" : ""}" data-url="${esc(mailWebUrl)}" data-id="${esc(x.id)}">
     <div class="from">${esc(x.from || "")}</div>
     <div class="date">${esc((x.date || "").slice(5, 16))}</div>
     <div class="subject">${esc(x.subject || "(无主题)")}</div>
     <div class="flags">${x.attached ? "附件 · " : ""}${x.unread ? "未读" : "已读"}</div>
-  </div>`).join("");
+  </div>`;
+  list.innerHTML = `<div class="mailgroup-head"><span>未读</span><b>${unread}</b></div>
+    ${unreadItems.length ? unreadItems.map(row).join("") : `<div class="mailnone">没有未读邮件</div>`}
+    <div class="mailgroup-head read"><span>已读</span><b>${readItems.length}</b></div>
+    ${readItems.length ? readItems.map(row).join("") : `<div class="mailnone">没有已读邮件</div>`}`;
   $$("#mailList .mailitem").forEach((el) => el.addEventListener("click", () => {
     if (el.dataset.id) openMailDetail(el.dataset.id);
     else if (el.dataset.url) openUrlSafe(el.dataset.url);
   }));
 }
-
 function attachMail(mail, deferDetails = false) {
-  pruneMailDetails(mail.items || []);
+  const items = mail.items || [];
+  // 未读邮件一律不预取正文，避免服务端“读取正文”把未读变成已读
+  Object.keys(state.mailDetails || {}).forEach((id) => {
+    const it = items.find((x) => x.id === id);
+    if (it && it.unread) delete state.mailDetails[id];
+  });
+  mail.unread = items.filter((x) => x.unread).length;
+  pruneMailDetails(items);
   state.data = state.data || {};
   state.data.mail = mail;
-  state.data.mail_unread = mail.portal_unread ?? mail.unread;
+  state.data.mail_unread = mail.unread;
   saveCache(state.data);
   renderMailBadge(state.data.mail_unread);
   if (!$("#mailView").classList.contains("hidden")) renderMail(mail);
@@ -1592,7 +1604,7 @@ function attachMail(mail, deferDetails = false) {
 }
 
 async function prefetchMailDetails(items) {
-  const queue = (items || []).filter((x) => x.id
+  const queue = (items || []).filter((x) => x.id && !x.unread
     && !(state.mailDetails[x.id] && state.mailDetails[x.id].status === "ok")
     && !state.mailPrefetching.has(x.id));
   if (!queue.length) return;
@@ -1656,11 +1668,27 @@ async function loadMail(force = false) {
   }
 }
 
+function markMailRead(id) {
+  const mail = state.data && state.data.mail;
+  if (!mail || !mail.items) return;
+  const it = mail.items.find((x) => x.id === id);
+  if (!it || !it.unread) return;
+  it.unread = false;
+  mail.unread = mail.items.filter((x) => x.unread).length;
+  state.data.mail_unread = mail.unread;
+  saveCache(state.data);
+  renderMailBadge(mail.unread);
+  if (!$("#mailView").classList.contains("hidden")) renderMail(mail);
+}
+
 async function openMailDetail(id) {
   mailDetailCurrentId = id;
   $("#mailDetailView").classList.remove("hidden");
+  const mail = state.data && state.data.mail;
+  const item = mail && mail.items ? mail.items.find((x) => x.id === id) : null;
+  const wasUnread = !!(item && item.unread);
   const cached = state.mailDetails[id];
-  if (cached && cached.status === "ok") {
+  if (cached && cached.status === "ok" && !wasUnread) {
     renderMailDetail(cached);
     return;
   }
@@ -1675,6 +1703,7 @@ async function openMailDetail(id) {
     pruneMailDetails(state.data && state.data.mail && state.data.mail.items);
     saveCache(state.data);
     renderMailDetail(d);
+    if (wasUnread) markMailRead(id);
   } catch (e) {
     $("#mailDetailHead").innerHTML = `<div class="subject">邮件读取失败</div>`;
     $("#mailBody").textContent = e.message;
