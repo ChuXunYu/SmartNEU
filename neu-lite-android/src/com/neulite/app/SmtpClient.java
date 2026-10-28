@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import android.util.Base64;
@@ -22,10 +23,13 @@ final class SmtpClient {
 
     static void send(String from, String password, String to, String subject, String body) throws Exception {
         Exception last = null;
-        String[][] hosts = {{"smtp.mails.neu.edu.cn", "465"}, {"smtp.neu.edu.cn", "465"}};
-        for (String[] hp : hosts) {
+        Object[][] hosts = {
+                {"smtp.mails.neu.edu.cn", 465, true},
+                {"smtp.neu.edu.cn", 465, true},
+        };
+        for (Object[] hp : hosts) {
             try {
-                sendOne(hp[0], Integer.parseInt(hp[1]), from, password, to, subject, body);
+                sendOne((String) hp[0], (Integer) hp[1], (Boolean) hp[2], from, password, to, subject, body);
                 return;
             } catch (Exception e) {
                 last = e;
@@ -34,17 +38,25 @@ final class SmtpClient {
         throw last == null ? new Exception("SMTP 连接失败") : last;
     }
 
-    private static void sendOne(String host, int port, String from, String password,
+    private static void sendOne(String host, int port, boolean ssl, String from, String password,
                                 String to, String subject, String body) throws Exception {
-        SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
-        socket.connect(new InetSocketAddress(host, port), 12000);
-        socket.setSoTimeout(15000);
-        try {
-            SSLParameters p = socket.getSSLParameters();
-            p.setServerNames(Collections.singletonList(new SNIHostName(host)));
-            socket.setSSLParameters(p);
-        } catch (Exception ignored) {}
-        socket.startHandshake();
+        Socket socket;
+        if (ssl) {
+            SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
+            s.connect(new InetSocketAddress(host, port), 12000);
+            s.setSoTimeout(15000);
+            try {
+                SSLParameters p = s.getSSLParameters();
+                p.setServerNames(Collections.singletonList(new SNIHostName(host)));
+                s.setSSLParameters(p);
+            } catch (Exception ignored) {}
+            s.startHandshake();
+            socket = s;
+        } else {
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(host, port), 12000);
+            socket.setSoTimeout(15000);
+        }
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         OutputStream out = socket.getOutputStream();
 

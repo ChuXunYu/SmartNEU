@@ -1790,6 +1790,7 @@ async function openCompose() {
   $("#composeSubject").value = "";
   $("#composeBody").value = "";
   $("#composeMsg").textContent = "";
+  $("#composeWebFallback").classList.add("hidden");
   $("#composeMask").classList.remove("hidden");
   if (!from) {
     try {
@@ -1836,6 +1837,9 @@ async function sendCompose() {
   } catch (e) {
     if (password) setComposePassSaved(readSavedPassword());
     $("#composeMsg").textContent = "发送失败：" + e.message;
+    if (/535|authentication failed/i.test(e.message)) {
+      $("#composeWebFallback").classList.remove("hidden");
+    }
   } finally {
     updateComposeReady();
   }
@@ -1930,6 +1934,7 @@ $("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
 $("#mailRefresh").addEventListener("click", () => loadMail(true));
 $("#mailCompose").addEventListener("click", openCompose);
 $("#composeCancel").addEventListener("click", closeCompose);
+$("#composeWebFallback").addEventListener("click", () => { closeCompose(); openWebCompose(); });
 $("#composeSend").addEventListener("click", sendCompose);
 $("#composeFrom").addEventListener("input", updateComposeReady);
 $("#composePassword").addEventListener("input", updateComposeReady);
