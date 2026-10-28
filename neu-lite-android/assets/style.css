@@ -935,3 +935,6 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .mailgroup-head.read span{color:var(--muted)}
 .mailgroup-head.read b{color:var(--muted);font-weight:400}
 .mailnone{font-size:10px;color:var(--muted);letter-spacing:.4px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+
+.mailhead .mailactions{display:flex;align-items:center;gap:14px}
+.mailhead .mailactions .textbtn{margin:0}

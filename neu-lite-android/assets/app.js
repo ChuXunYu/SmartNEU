@@ -1324,10 +1324,10 @@ function exportCsv(kind) {
 }
 
 /* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
-function openUrlSafe(url) {
+function openUrlSafe(url, title = "邮箱") {
   if (!url) return;
   if (window.NEU) {
-    if (window.NEU.call) window.NEU.call("openWeb", JSON.stringify({ url, title: "邮箱" }));
+    if (window.NEU.call) window.NEU.call("openWeb", JSON.stringify({ url, title }));
     else window.NEU.openUrl(url);
   } else {
     window.open(url, "_blank", "noopener");
@@ -1720,6 +1720,26 @@ function openMail() {
   loadMail();
 }
 
+async function composeMail() {
+  let url = mailWebUrl;
+  if (!url) {
+    try {
+      const d = await api("/api/mail");
+      attachMail(d);
+      url = d.web_url || "";
+    } catch (e) {
+      toast("邮箱会话读取失败：" + e.message);
+      return;
+    }
+  }
+  if (!url) {
+    toast("邮箱会话已失效，请刷新邮箱后重试");
+    return;
+  }
+  const base = url.split("#")[0];
+  openUrlSafe(base + "#mail.compose", "写信");
+}
+
 function closeMail() {
   closeMailDetail();
   $("#mailView").classList.add("hidden");
@@ -1807,6 +1827,7 @@ $("#mailBack").addEventListener("click", closeMail);
 $("#mailDetailBack").addEventListener("click", closeMailDetail);
 $("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
 $("#mailRefresh").addEventListener("click", () => loadMail(true));
+$("#mailCompose").addEventListener("click", composeMail);
 
 /* ---------------- 标签页 ---------------- */
 function activateTab(name) {
