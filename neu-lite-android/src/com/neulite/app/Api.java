@@ -601,7 +601,6 @@ public class Api {
     static final String MAIL_API = "https://mails.neu.edu.cn/coremail/s";
     static final String PAY = "https://pay.neu.edu.cn";
     private boolean ecodeAuthed = false;
-    private String ecodeFinal = "";
     private boolean payAuthed = false;
 
     JSONObject httpGetJson(String url, String referer) throws Exception {
@@ -657,7 +656,6 @@ public class Api {
         if (ecodeAuthed) return;
         for (int attempt = 0; attempt < 2; attempt++) {
             String[] r = httpGetFollow(ECODE + "/api/sso/login?redirect_to=/ecode", 20);
-            ecodeFinal = r[0];
             if (r[0].startsWith(ECODE)) { ecodeAuthed = true; return; }
             if (attempt == 0 && relogin()) continue;
             throw new ApiException(-1, "e码通登录失败: " + r[0]);
@@ -739,7 +737,6 @@ public class Api {
             String msg = e.getMessage();
             if (msg != null && msg.contains("登录失败")) msg = "登录已失效，请重新登录后刷新";
             put(out, "qr_error", msg);
-            put(out, "ecode_final", ecodeFinal);
         }
         put(out, "updated_at", System.currentTimeMillis());
         return out;
@@ -841,7 +838,6 @@ public class Api {
             if (queryParam(sso[0], "sid").isEmpty() && relogin()) {
                 sso = httpGetFollow(MAIL_SSO, 20);
             }
-            put(out, "mail_final", sso[0]);
             String sid = queryParam(sso[0], "sid");
             if (sid.isEmpty()) throw new ApiException(-1, "邮箱登录失败");
             String url = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
