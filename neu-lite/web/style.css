@@ -862,3 +862,12 @@ body.card-mode #panel-card .section-head{margin:10px 0 8px}
 .pastgroup summary b::after{content:"展开";font-size:8px;letter-spacing:1px}
 .pastgroup[open] summary b::after{content:"收起"}
 .pastgroup .exam{opacity:.62}
+
+/* 课表/考试页顶部恢复一点呼吸感 */
+body.roomy-top .masthead{padding-top:10px}
+body.roomy-top .hello{margin:9px 0 8px}
+body.roomy-top h1#greet{margin:3px 0 3px}
+body.roomy-top .ledger{padding:9px 22px}
+body.roomy-top .updated{padding:4px 22px 5px}
+body.roomy-top #panel-schedule .section-head,
+body.roomy-top #panel-exams .section-head{margin:12px 0 9px;padding-bottom:7px}

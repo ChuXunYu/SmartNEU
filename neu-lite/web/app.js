@@ -1507,6 +1507,7 @@ function activateTab(name) {
   if (!btn) return;
   state.tab = name;
   document.body.classList.toggle("card-mode", name === "card");
+  document.body.classList.toggle("roomy-top", name === "schedule" || name === "exams");
   $$(".tab").forEach((b) => b.classList.toggle("active", b === btn));
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
@@ -1534,6 +1535,7 @@ document.addEventListener("click", (e) => {
 
 applyViewUI();
 if (location.hash) activateTab(location.hash.slice(1));
+else document.body.classList.add("roomy-top");
 boot();
 
 
