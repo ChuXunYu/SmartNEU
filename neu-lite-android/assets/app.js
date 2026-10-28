@@ -324,7 +324,7 @@ function statsFor(tab) {
   }
   if (tab === "exams") {
     const items = (d.exams || {}).items || [];
-    const up = items.filter((x) => String(x.time || "").slice(0, 10) >= today).length;
+    const up = items.filter((x) => !isExamPast(x)).length;
     return [
       { v: up, l: "待考" },
       { v: items.length - up, l: "已结束" },
@@ -655,6 +655,38 @@ $("#prevWeek").addEventListener("click", () => loadWeek(-1));
 $("#nextWeek").addEventListener("click", () => loadWeek(1));
 
 /* ---------------- 考试 ---------------- */
+function examParts(x) {
+  const t = String(x.time || "");
+  const date = t.slice(0, 10);
+  const hm = t.slice(11);
+  const m = hm.match(/(\d{1,2}:\d{2})\s*[-–~]\s*(\d{1,2}:\d{2})/);
+  return { date, start: m ? m[1] : "", end: m ? m[2] : "", text: hm };
+}
+
+function hmMinutes(s) {
+  const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+function isExamPast(x) {
+  const p = examParts(x);
+  if (!p.date) return false;
+  const now = new Date();
+  const today = ymd(now);
+  if (p.date < today) return true;
+  if (p.date > today) return false;
+  const end = hmMinutes(p.end);
+  if (end == null) return false;
+  return now.getHours() * 60 + now.getMinutes() > end;
+}
+
+function examDayText(x) {
+  const p = examParts(x);
+  const d = new Date(p.date + "T00:00:00");
+  const wd = isNaN(d.getTime()) ? "" : WEEK_NAMES[d.getDay()];
+  return `${p.date.slice(5).replace("-", ".")} ${wd}`.trim();
+}
+
 function renderExams(exams) {
   const box = $("#examList");
   if (!exams) { box.innerHTML = `<div class="empty">暂无考试数据</div>`; return; }
@@ -667,28 +699,32 @@ function renderExams(exams) {
       : `<div class="empty">暂无考试安排</div>`;
     return;
   }
-  const todayStr = ymd(new Date());
-  const byTime = (x) => String(x.time || "").slice(0, 10);
-  const ordered = [
-    ...items.filter((x) => byTime(x) >= todayStr).sort((a, b) => String(a.time).localeCompare(String(b.time))),
-    ...items.filter((x) => byTime(x) < todayStr).sort((a, b) => String(b.time).localeCompare(String(a.time))),
-  ];
-  const today = new Date(todayStr + "T00:00:00");
-  box.innerHTML = ordered.map((x) => {
-    const t = String(x.time || "");
-    const date = t.slice(0, 10);
-    const d = new Date(date + "T00:00:00");
-    const diff = Math.round((d - today) / 86400000);
-    let status = `<span class="status soon">还有 ${diff} 天</span>`;
-    if (diff < 0) status = `<span class="status done">已结束</span>`;
-    else if (diff === 0) status = `<span class="status now">今天</span>`;
+  const upcoming = items.filter((x) => !isExamPast(x))
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  const past = items.filter((x) => isExamPast(x))
+    .sort((a, b) => String(b.time).localeCompare(String(a.time)));
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const today = ymd(now);
+
+  const card = (x, isPast) => {
+    const p = examParts(x);
+    const d = new Date(p.date + "T00:00:00");
     const wd = isNaN(d.getTime()) ? "" : WEEK_NAMES[d.getDay()];
-    return `<div class="exam">
-      <div class="datebox"><b>${date.slice(8) || "--"}</b><span>${date.slice(5, 7)}月</span><i>${wd}</i></div>
+    const diff = Math.round((d - new Date(today + "T00:00:00")) / 86400000);
+    let status = `<span class="status soon">还有 ${diff} 天</span>`;
+    if (isPast) status = `<span class="status done">已结束</span>`;
+    else if (diff === 0) {
+      const start = hmMinutes(p.start), end = hmMinutes(p.end);
+      if (start != null && end != null && nowMin >= start && nowMin <= end) status = `<span class="status now">进行中</span>`;
+      else status = `<span class="status now">今天</span>`;
+    }
+    return `<div class="exam ${isPast ? "past" : ""}">
+      <div class="datebox"><b>${p.date.slice(8) || "--"}</b><span>${p.date.slice(5, 7)}月</span><i>${wd}</i></div>
       <div class="info">
         <div class="co">${esc(x.course || "")}</div>
         <div class="meta">
-          <span class="pill">${esc(t.slice(11) || "")}</span>
+          <span class="pill">${esc(p.text || "")}</span>
           ${x.place ? `<span class="pill loc">${esc(x.place)}</span>` : ""}
           ${x.seat ? `<span class="pill">座位 ${esc(x.seat)}</span>` : ""}
           ${x.type ? `<span class="pill">${esc(x.type)}</span>` : ""}
@@ -696,7 +732,44 @@ function renderExams(exams) {
       </div>
       ${status}
     </div>`;
-  }).join("");
+  };
+
+  let html = "";
+  if (upcoming.length) {
+    const next = upcoming[0];
+    const p = examParts(next);
+    const d = new Date(p.date + "T00:00:00");
+    const diff = Math.round((d - new Date(today + "T00:00:00")) / 86400000);
+    const start = hmMinutes(p.start), end = hmMinutes(p.end);
+    const ongoing = diff === 0 && start != null && end != null && nowMin >= start && nowMin <= end;
+    const dayMain = ongoing ? "现在" : (diff === 0 ? "今天" : String(diff));
+    const daySub = ongoing ? "进行中" : (diff === 0 ? (p.start || "今天") : "天后");
+    html += `<div class="examnext">
+      <div class="enn-main">
+        <div class="enn-label">下一场考试</div>
+        <div class="enn-co">${esc(next.course || "")}</div>
+        <div class="enn-meta">${examDayText(next)}${p.text ? " · " + esc(p.text) : ""}</div>
+        <div class="enn-place">${esc(next.place || "地点待定")}${next.seat ? " · 座位 " + esc(next.seat) : ""}</div>
+      </div>
+      <div class="enn-day"><b>${dayMain}</b><span>${daySub}</span></div>
+    </div>`;
+    html += `<div class="examgroup">
+      <div class="examgroup-head"><h4>待考</h4><span>${upcoming.length} 场</span></div>
+      <div class="examlist">${upcoming.map((x) => card(x, false)).join("")}</div>
+    </div>`;
+  } else {
+    html += `<div class="examgroup">
+      <div class="examgroup-head"><h4>待考</h4><span>0 场</span></div>
+      <div class="examnone">暂无待考</div>
+    </div>`;
+  }
+  if (past.length) {
+    html += `<details class="examgroup pastgroup" ${upcoming.length ? "" : "open"}>
+      <summary><span>已结束</span><i>${past.length} 场</i><b>展开</b></summary>
+      <div class="examlist">${past.map((x) => card(x, true)).join("")}</div>
+    </details>`;
+  }
+  box.innerHTML = html;
 }
 
 async function probeJwxt() {

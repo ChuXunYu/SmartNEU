@@ -842,3 +842,33 @@ body.card-mode #panel-card .section-head{margin:10px 0 8px}
 .grade-filter.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .grade-filter.on i{color:var(--paper-3)}
 .gradelist{margin-top:2px}
+
+/* ---------------- 考试：下一场 + 待考/已结束 ---------------- */
+.examnext{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
+  background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:13px 15px;margin:2px 0 14px}
+.enn-label{font-size:8px;letter-spacing:2px;color:var(--red);margin-bottom:2px}
+.enn-co{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:.5px;margin-top:6px;line-height:1.4}
+.enn-meta{font-size:9.5px;letter-spacing:.4px;color:var(--ink-2);margin-top:5px}
+.enn-place{font-size:9px;letter-spacing:.3px;color:var(--muted);margin-top:3px}
+.enn-day{text-align:right;border-left:1px solid var(--line);padding-left:14px;min-width:66px}
+.enn-day b{display:block;font-family:var(--serif);font-size:36px;font-weight:600;line-height:1;color:var(--red);letter-spacing:-.5px;white-space:nowrap}
+.enn-day span{display:block;font-size:8px;letter-spacing:1.4px;color:var(--muted);margin-top:5px}
+.examgroup-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:14px 0 3px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.examgroup-head h4{font-family:var(--serif);font-size:12px;font-weight:600;letter-spacing:2px}
+.examgroup-head span{font-size:8px;letter-spacing:1px;color:var(--muted)}
+.examgroup .examlist{gap:0}
+.exam.past{opacity:.66}
+.exam.past .co{color:var(--ink-2)}
+.exam.past .datebox b{color:var(--muted)}
+.examnone{font-size:10px;color:var(--muted);letter-spacing:.5px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.pastgroup{margin-top:18px;border-top:1px solid var(--line);padding-top:0}
+.pastgroup summary{list-style:none;display:flex;align-items:baseline;gap:8px;padding:13px 0 9px;cursor:pointer;user-select:none}
+.pastgroup summary::-webkit-details-marker{display:none}
+.pastgroup summary span{font-family:var(--serif);font-size:12px;font-weight:600;letter-spacing:2px}
+.pastgroup summary i{font-style:normal;font-size:8px;color:var(--muted);letter-spacing:1px}
+.pastgroup summary b{font-weight:400;font-size:0;margin-left:auto;color:var(--red)}
+.pastgroup summary b::after{content:"展开";font-size:8px;letter-spacing:1px}
+.pastgroup[open] summary b::after{content:"收起"}
+.pastgroup .exam{opacity:.62}
