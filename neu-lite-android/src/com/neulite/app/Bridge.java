@@ -14,6 +14,8 @@ public class Bridge {
     private final MainActivity act;
     private final Api api;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    // 邮箱列表/正文单独排队，避免 27 封正文预取阻塞总览、课表、网费等主请求
+    private final ExecutorService mailWorker = Executors.newSingleThreadExecutor();
     private final ConcurrentHashMap<String, String> results = new ConcurrentHashMap<>();
 
     public Bridge(MainActivity act, Api api) {
@@ -53,7 +55,8 @@ public class Bridge {
     public void callAsync(String action, String payload, String id) {
         final JSONObject p = parse(payload);
         final String requestId = id == null ? "" : id;
-        worker.execute(() -> {
+        ExecutorService target = ("mail".equals(action) || "mailDetail".equals(action)) ? mailWorker : worker;
+        target.execute(() -> {
             String out;
             try {
                 out = run(action, p);

@@ -212,7 +212,6 @@ async function refresh() {
   refreshing = true;
   const myId = ++refreshId;
   startRefresh();
-  const mailTask = withTimeout(api("/api/mail"), 15000, "邮箱更新超时").catch(() => null);
   try {
     const d = await withTimeout(api("/api/overview"), 20000, "更新超时（20 秒）");
     if (myId !== refreshId) return;
@@ -227,10 +226,13 @@ async function refresh() {
     setUpdated(Date.now());
     finishRefresh(true);
     setTimeout(loadIpwg, 500);
-    mailTask.then((mail) => {
-      if (!mail || myId !== refreshId || !state.data) return;
-      attachMail(mail);
-    });
+    // 邮箱比总览/网费慢，延后到低优先级执行，避免拖慢更新动画
+    setTimeout(() => {
+      if (myId !== refreshId || !state.session || !state.session.logged_in) return;
+      withTimeout(api("/api/mail"), 15000, "邮箱更新超时")
+        .then((mail) => { if (mail && myId === refreshId) attachMail(mail, true); })
+        .catch(() => {});
+    }, 1200);
   } catch (e) {
     if (myId !== refreshId) return;
     toast("更新失败：" + e.message);
@@ -1473,14 +1475,15 @@ function renderMail(data) {
   }));
 }
 
-function attachMail(mail) {
+function attachMail(mail, deferDetails = false) {
   state.data = state.data || {};
   state.data.mail = mail;
   state.data.mail_unread = mail.portal_unread ?? mail.unread;
   saveCache(state.data);
   renderMailBadge(state.data.mail_unread);
   if (!$("#mailView").classList.contains("hidden")) renderMail(mail);
-  prefetchMailDetails(mail.items || []);
+  if (deferDetails) setTimeout(() => prefetchMailDetails(mail.items || []), 800);
+  else prefetchMailDetails(mail.items || []);
 }
 
 async function prefetchMailDetails(items) {
@@ -1506,7 +1509,7 @@ async function prefetchMailDetails(items) {
       }
     }
   };
-  const n = Math.min(3, queue.length);
+  const n = Math.min(1, queue.length);
   await Promise.all(Array.from({ length: n }, () => worker()));
 }
 
