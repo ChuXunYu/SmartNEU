@@ -133,7 +133,14 @@ function loadCache() {
   } catch { return null; }
 }
 function saveCache(d) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: d })); } catch {}
+  try {
+    const copy = Object.assign({}, d);
+    if (copy.mail) {
+      copy.mail = Object.assign({}, copy.mail);
+      delete copy.mail.web_url;
+    }
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: copy }));
+  } catch {}
 }
 function clearCache() {
   try { localStorage.removeItem(CACHE_KEY); } catch {}
@@ -154,7 +161,8 @@ function renderAll(d) {
   renderExams(d.exams);
   renderGrades(d.grades);
   renderNet(d.net);
-  renderMailBadge(d.mail_unread);
+  renderMailBadge(d.mail?.portal_unread ?? d.mail?.unread ?? d.mail_unread);
+  if (d.mail && !$("#mailView").classList.contains("hidden")) renderMail(d.mail);
   if (d.session?.imei) $("#imei").textContent = `设备 ${d.session.imei}`;
 }
 
@@ -193,15 +201,30 @@ async function refresh() {
   refreshing = true;
   const myId = ++refreshId;
   startRefresh();
+  const mailTask = withTimeout(api("/api/mail"), 15000, "邮箱更新超时").catch(() => null);
   try {
     const d = await withTimeout(api("/api/overview"), 20000, "更新超时（20 秒）");
     if (myId !== refreshId) return;
+    const prevMail = state.data && state.data.mail;
+    if (prevMail && !d.mail) {
+      d.mail = prevMail;
+      d.mail_unread = prevMail.portal_unread ?? prevMail.unread;
+    }
     renderAll(d);
     renderStats(state.tab, false);
     saveCache(d);
     setUpdated(Date.now());
     finishRefresh(true);
     setTimeout(loadIpwg, 500);
+    mailTask.then((mail) => {
+      if (!mail || myId !== refreshId || !state.data) return;
+      const unread = mail.portal_unread ?? mail.unread;
+      state.data.mail = mail;
+      state.data.mail_unread = unread;
+      saveCache(state.data);
+      renderMailBadge(unread);
+      if (!$("#mailView").classList.contains("hidden")) renderMail(mail);
+    });
   } catch (e) {
     if (myId !== refreshId) return;
     toast("更新失败：" + e.message);
@@ -288,7 +311,6 @@ function renderHeader(d) {
   $("#todayLabel").textContent = `${now.getFullYear()} / ${pad(now.getMonth() + 1)} / ${pad(now.getDate())} · ${wd}`;
   $("#greet").textContent = `${greeting()}，${p.name || "同学"}`;
   $("#who").textContent = [p.depart, p.xgh || p.username, p.role].filter(Boolean).join(" · ");
-  $("#btnLogout").textContent = (p.name || "我").slice(0, 1);
   $("#btnImport").classList.toggle("hidden", !window.NEU);
   renderStats(state.tab, false);
 }
@@ -1106,7 +1128,6 @@ $("#btnVerify").addEventListener("click", async () => {
   } catch (e) { toast(e.message); }
 });
 
-$("#btnLogout").addEventListener("click", doLogout);
 $("#btnLogout2").addEventListener("click", doLogout);
 async function doLogout() {
   closeSheet();
@@ -1400,17 +1421,30 @@ function renderMail(data) {
   }));
 }
 
-async function loadMail() {
+async function loadMail(force = false) {
+  const cached = state.data && state.data.mail;
+  if (cached && !force) {
+    renderMail(cached);
+    return;
+  }
   if (mailLoading) return;
   mailLoading = true;
-  $("#mailList").innerHTML = `<div class="empty">正在读取邮箱…</div>`;
-  $("#mailMeta").textContent = "";
+  if (!cached) {
+    $("#mailList").innerHTML = `<div class="empty">正在读取邮箱…</div>`;
+    $("#mailMeta").textContent = "";
+  } else {
+    $("#mailMeta").textContent = "正在刷新邮箱…";
+  }
   try {
     const d = await api("/api/mail");
+    state.data = state.data || {};
+    state.data.mail = d;
+    state.data.mail_unread = d.portal_unread ?? d.unread;
+    saveCache(state.data);
     renderMail(d);
     if (d.status === "partial") toast(d.error || "邮箱读取失败");
   } catch (e) {
-    $("#mailList").innerHTML = `<div class="empty">${esc(e.message || "邮箱读取失败")}</div>`;
+    if (!cached) $("#mailList").innerHTML = `<div class="empty">${esc(e.message || "邮箱读取失败")}</div>`;
     toast("邮箱读取失败：" + e.message);
   } finally {
     mailLoading = false;
@@ -1529,7 +1563,7 @@ $("#btnCardMail").addEventListener("click", openMail);
 $("#mailBack").addEventListener("click", closeMail);
 $("#mailDetailBack").addEventListener("click", closeMailDetail);
 $("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
-$("#mailRefresh").addEventListener("click", loadMail);
+$("#mailRefresh").addEventListener("click", () => loadMail(true));
 
 /* ---------------- 标签页 ---------------- */
 function activateTab(name) {

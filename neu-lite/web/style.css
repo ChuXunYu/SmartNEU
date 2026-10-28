@@ -876,3 +876,16 @@ body.roomy-top #panel-exams .section-head{margin:12px 0 9px;padding-bottom:7px}
   font-size:10px;letter-spacing:.8px}
 .qrloading i{width:12px;height:12px;border:1.5px solid var(--line);border-top-color:var(--red);
   border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+
+/* 顶部邮件/更多：拉开层次，移除头像入口 */
+.hero-actions{gap:8px}
+.mailbtn{position:relative;display:inline-flex;align-items:center;gap:5px;width:auto;height:32px;
+  padding:0 9px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+  cursor:pointer;line-height:1;font-family:var(--sans)}
+.mailbtn .mico{font-family:var(--serif);font-size:13px;letter-spacing:1px}
+.mailbtn .mtxt{font-size:9px;letter-spacing:1.5px;color:var(--paper-3)}
+.mailbtn:hover{background:var(--red-deep);border-color:var(--red-deep)}
+.morebtn{border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;
+  height:32px;padding:0 10px;font:9.5px/1 var(--sans);letter-spacing:1.6px}
+.morebtn:hover{border-color:var(--ink)}
+.mailbadge{right:-5px;top:-5px}

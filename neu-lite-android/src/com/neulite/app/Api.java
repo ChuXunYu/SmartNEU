@@ -22,7 +22,11 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -823,7 +827,7 @@ public class Api {
                 .replace("&apos;", "'").replace("&amp;", "&");
     }
 
-    static String qpDecode(String s, String charset) {
+    static byte[] qpBytes(String s, boolean underscoreSpace) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] b = s.getBytes(StandardCharsets.US_ASCII);
@@ -833,10 +837,14 @@ public class Api {
                     int lo = Character.digit((char) b[i + 2], 16);
                     if (hi >= 0 && lo >= 0) { out.write((hi << 4) | lo); i += 2; continue; }
                 }
-                out.write(b[i] == '_' ? ' ' : b[i]);
+                out.write(b[i] == '_' && underscoreSpace ? ' ' : b[i]);
             }
-            return new String(out.toByteArray(), Charset.forName(charset));
-        } catch (Exception e) { return s; }
+            return out.toByteArray();
+        } catch (Exception e) { return s.getBytes(StandardCharsets.US_ASCII); }
+    }
+
+    static String qpDecode(String s, String charset) {
+        return decodeBytesBest(qpBytes(s, true), charset);
     }
 
     static String decodeMime(String value) {
@@ -1032,6 +1040,40 @@ public class Api {
         try { return Long.parseLong(m.group(1).trim()); } catch (Exception e) { return 0; }
     }
 
+    static String decodeBytesBest(byte[] bytes, String preferred) {
+        String[] names = {preferred, "UTF-8", "GB18030", "GBK"};
+        for (String name : names) {
+            if (name == null || name.isEmpty()) continue;
+            try {
+                CharsetDecoder dec = Charset.forName(name).newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT);
+                CharBuffer cb = dec.decode(ByteBuffer.wrap(bytes));
+                return cb.toString();
+            } catch (Exception ignored) {}
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    static String decodeMailBody(byte[] raw, int off, int len, String charset) {
+        String cs = charset == null || charset.isEmpty() ? "UTF-8" : charset;
+        byte[] bytes = new byte[len];
+        System.arraycopy(raw, off, bytes, 0, len);
+        String ascii = new String(bytes, StandardCharsets.ISO_8859_1);
+        String compact = ascii.replaceAll("\\s", "");
+        String trimmed = ascii.trim();
+        if (compact.length() >= 32 && compact.length() % 4 == 0
+                && trimmed.matches("[A-Za-z0-9+/=\\r\\n]+")) {
+            try {
+                return decodeBytesBest(Base64.decode(compact, Base64.DEFAULT), cs);
+            } catch (Exception ignored) {}
+        }
+        if (ascii.matches("(?s).*=[0-9A-Fa-f]{2}.*")) {
+            try { return decodeBytesBest(qpBytes(ascii, false), cs); } catch (Exception ignored) {}
+        }
+        return decodeBytesBest(bytes, cs);
+    }
+
     public JSONObject mailDetail(String mid) throws Exception {
         String[] sso = mailSso();
         String sid = queryParam(sso[0], "sid");
@@ -1061,8 +1103,7 @@ public class Api {
             if (off >= 0 && off + len <= raw.length) {
                 String cs = paramValue(ctype, "charset");
                 if (cs.isEmpty()) cs = "UTF-8";
-                try { text = new String(raw, (int) off, (int) len, Charset.forName(cs)); }
-                catch (Exception e) { text = new String(raw, (int) off, (int) len, StandardCharsets.UTF_8); }
+                text = decodeMailBody(raw, (int) off, (int) len, cs);
             }
         }
         if (ctype.toLowerCase(Locale.US).contains("text/html")) {
