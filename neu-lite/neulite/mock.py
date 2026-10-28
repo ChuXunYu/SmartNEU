@@ -46,4 +46,32 @@ def overview() -> dict:
                 "policy": "波谷免费/阶段1：下行0～10G，免费/阶段2：下行10～25G，1G/元",
                 "duration": "120时", "product": "学生账户", "via": "mock",
                 "links": []},
+        "card_balance": "23.50", "card_unit": "元", "mail_unread": "2",
+    }
+
+
+def card_info() -> dict:
+    import time
+    now = int(time.time() * 1000)
+    return {
+        "status": "ok", "name": "示例同学", "student_id": "20230001",
+        "balance": "23.50", "unit": "元", "department": "计算机科学与工程学院",
+        "qr": {"code": "NEU000000000000000000", "created_at": now, "expires_at": now + 10000},
+        "valid_until": "2028-07-01",
+        "gate": {"name": "默认允许进校", "color": "#006633", "result": "4"},
+        "updated_at": now,
+    }
+
+
+def mail_info() -> dict:
+    return {
+        "status": "ok", "unread": 2, "web_url": "",
+        "items": [
+            {"id": "demo1", "from": "教务处", "subject": "关于期中考试安排的通知",
+             "date": "2026-10-27 09:00:00", "size": "12000", "unread": True, "attached": True},
+            {"id": "demo2", "from": "图书馆", "subject": "图书借阅到期提醒",
+             "date": "2026-10-26 15:30:00", "size": "8000", "unread": True, "attached": False},
+            {"id": "demo3", "from": "软件学院", "subject": "本周年级大会",
+             "date": "2026-10-25 10:00:00", "size": "6000", "unread": False, "attached": False},
+        ],
     }

@@ -94,6 +94,11 @@ async function nativeApi(path, opts = {}) {
     case "/api/schedule": return nativeCallAsync("schedule", { start: params.get("start") || "" });
     case "/api/net": return nativeCallAsync("net");
     case "/api/ipgw": return nativeCallAsync("ipgw");
+    case "/api/card": return nativeCallAsync("card");
+    case "/api/mail": return nativeCallAsync("mail");
+    case "/api/pay/card": return nativeCallAsync("payCard", body);
+    case "/api/pay/net": return nativeCallAsync("payNet", body);
+    case "/api/pay/order": return nativeCallAsync("payOrder", { order_no: params.get("order_no") || "" });
     case "/api/jwxt": return nativeCallAsync("jwxt", { probe: params.get("probe") === "1" });
     case "/api/login": return nativeCallAsync(body.quick ? "quickLogin" : "login", body);
     case "/api/sms": return nativeCallAsync("sms", body);
@@ -146,6 +151,7 @@ function renderAll(d) {
   renderExams(d.exams);
   renderGrades(d.grades);
   renderNet(d.net);
+  renderMailBadge(d.mail_unread);
   if (d.session?.imei) $("#imei").textContent = `设备 ${d.session.imei}`;
 }
 
@@ -318,7 +324,7 @@ function statsFor(tab) {
 
 function renderStats(tab = state.tab, animate = true) {
   const led = $("#ledger");
-  if (tab === "net") { led.classList.add("hidden"); return; }
+  if (tab === "net" || tab === "card") { led.classList.add("hidden"); return; }
   led.classList.remove("hidden");
   const paint = () => {
     const cells = statsFor(tab);
@@ -904,6 +910,244 @@ function exportCsv(kind) {
   location.href = kind === "exams" ? "/api/export/exams.csv" : "/api/export/timetable.csv";
 }
 
+/* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
+let qrTimer = null;
+let cardLoading = false;
+let mailLoading = false;
+let mailWebUrl = "";
+let payTarget = "card";
+let payPollTimer = null;
+
+function openUrlSafe(url) {
+  if (!url) return;
+  if (window.NEU) {
+    if (window.NEU.call) window.NEU.call("openWeb", JSON.stringify({ url, title: "邮箱" }));
+    else window.NEU.openUrl(url);
+  } else {
+    window.open(url, "_blank", "noopener");
+  }
+}
+
+function renderMailBadge(n) {
+  const badge = $("#mailBadge");
+  if (!badge) return;
+  const v = parseInt(n, 10);
+  if (!isNaN(v) && v > 0) {
+    badge.textContent = v > 99 ? "99+" : String(v);
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+
+function stopQr() {
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+}
+
+function startQr(qr) {
+  stopQr();
+  const box = $("#cardQr");
+  const code = qr.code || "";
+  if (!code || !window.qrcode) {
+    box.innerHTML = `<div class="qrfail">二维码暂不可用</div>`;
+    return;
+  }
+  try {
+    const g = qrcode(0, "M");
+    g.addData(code);
+    g.make();
+    box.innerHTML = g.createSvgTag({ cellSize: 4, margin: 0 });
+  } catch (e) {
+    box.innerHTML = `<div class="qrfail">二维码生成失败</div>`;
+    return;
+  }
+  const expires = Number(qr.expires_at || 0);
+  const tick = () => {
+    const left = expires ? Math.max(0, Math.ceil((expires - Date.now()) / 1000)) : 10;
+    const el = $("#qrTime");
+    if (el) el.textContent = left > 0 ? `${left} 秒后刷新` : "正在刷新…";
+    if (left <= 0) {
+      stopQr();
+      loadCard(true);
+    }
+  };
+  tick();
+  qrTimer = setInterval(tick, 1000);
+}
+
+function renderCard(d) {
+  const bal = d.balance != null && d.balance !== "" ? esc(d.balance) : "—";
+  const unit = esc(d.unit || "元");
+  const name = esc(d.name || "同学");
+  const sid = esc(d.student_id || "");
+  const gate = d.gate || {};
+  $("#cardStatus").textContent = d.status === "ok" ? "正常卡" : "部分数据";
+  $("#cardHero").innerHTML = `<div class="cardwho"><b>${name}</b><span>${sid ? "学号 " + sid : ""}</span></div>
+    <div class="cardbal"><b>${bal}</b><span>${unit}</span></div>
+    <div class="cardsub"><span>校园卡余额</span><span>${d.valid_until ? "有效期至 " + esc(d.valid_until) : ""}</span></div>`;
+  if (d.qr && d.qr.code) {
+    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div>
+      <div id="cardQr"></div>
+      <div class="qrtime" id="qrTime">—</div>
+      <div class="qrvalid">${d.valid_until ? "虚拟卡有效期至 " + esc(d.valid_until) : "e码通虚拟卡"}</div>
+      ${gate.name ? `<div class="qrgate">${esc(gate.name)}</div>` : ""}`;
+    startQr(d.qr);
+  } else {
+    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div>
+      <div class="qrfail">${esc(d.qr_error || "暂时无法获取二维码，请稍后重试")}</div>`;
+  }
+}
+
+async function loadCard(force = false) {
+  if (cardLoading) return;
+  cardLoading = true;
+  if (force || !state.card) {
+    $("#cardHero").innerHTML = `<div class="cardwho"><b>正在读取校园卡</b><span></span></div>
+      <div class="cardbal"><b>—</b><span>元</span></div>`;
+    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">正在获取二维码…</div>`;
+  }
+  try {
+    const d = await api("/api/card");
+    state.card = d;
+    renderCard(d);
+    if (d.status !== "ok") toast(d.qr_error || "校园卡部分数据读取失败");
+  } catch (e) {
+    $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">${esc(e.message || "读取失败")}</div>`;
+    toast("校园卡读取失败：" + e.message);
+  } finally {
+    cardLoading = false;
+  }
+}
+
+function renderMail(data) {
+  const list = $("#mailList");
+  const items = data.items || [];
+  const unread = data.portal_unread != null && data.portal_unread !== ""
+    ? data.portal_unread : data.unread;
+  renderMailBadge(unread != null ? unread : items.filter((x) => x.unread).length);
+  mailWebUrl = data.web_url || "";
+  $("#mailMeta").textContent = data.status === "partial"
+    ? "邮箱部分数据读取失败"
+    : `收件箱 ${items.length} 封 · 未读 ${unread != null ? unread : 0} 封`;
+  if (!items.length) {
+    list.innerHTML = `<div class="empty">${data.error ? esc(data.error) : "收件箱为空"}</div>`;
+    return;
+  }
+  list.innerHTML = items.map((x) => `<div class="mailitem ${x.unread ? "unread" : ""}" data-url="${esc(mailWebUrl)}">
+    <div class="from">${esc(x.from || "")}</div>
+    <div class="date">${esc((x.date || "").slice(5, 16))}</div>
+    <div class="subject">${esc(x.subject || "(无主题)")}</div>
+    <div class="flags">${x.attached ? "附件 · " : ""}${x.unread ? "未读" : "已读"}</div>
+  </div>`).join("");
+  $$("#mailList .mailitem").forEach((el) => el.addEventListener("click", () => {
+    if (el.dataset.url) openUrlSafe(el.dataset.url);
+  }));
+}
+
+async function loadMail() {
+  if (mailLoading) return;
+  mailLoading = true;
+  $("#mailList").innerHTML = `<div class="empty">正在读取邮箱…</div>`;
+  $("#mailMeta").textContent = "";
+  try {
+    const d = await api("/api/mail");
+    renderMail(d);
+    if (d.status === "partial") toast(d.error || "邮箱读取失败");
+  } catch (e) {
+    $("#mailList").innerHTML = `<div class="empty">${esc(e.message || "邮箱读取失败")}</div>`;
+    toast("邮箱读取失败：" + e.message);
+  } finally {
+    mailLoading = false;
+  }
+}
+
+function openMail() {
+  $("#mailView").classList.remove("hidden");
+  loadMail();
+}
+
+function closeMail() {
+  $("#mailView").classList.add("hidden");
+}
+
+function openPaySheet(target) {
+  payTarget = target;
+  $("#payMask").classList.remove("hidden");
+  $("#payTitle").textContent = target === "card" ? "校园卡充值" : "网费充值";
+  const bal = target === "card"
+    ? (state.card?.balance != null ? `当前余额 ¥ ${state.card.balance}` : "校园卡")
+    : (() => {
+        const c = (state.data?.net?.cards || []).find((x) => /网费/.test(x.name || ""));
+        return c ? `当前余额 ¥ ${c.value}${c.unit || ""}` : "网费";
+      })();
+  $("#payBalance").textContent = bal;
+  $("#payAmount").value = "";
+  $("#payMsg").textContent = "";
+  $$("#payPresets button").forEach((b) => b.classList.remove("on"));
+}
+
+function closePaySheet() {
+  $("#payMask").classList.add("hidden");
+  if (payPollTimer) { clearTimeout(payPollTimer); payPollTimer = null; }
+}
+
+async function pollPay(orderNo, tries = 0) {
+  if (!orderNo) return;
+  if (tries > 45) { toast("支付结果查询超时，请稍后在缴费平台查看"); return; }
+  try {
+    const r = await api(`/api/pay/order?order_no=${encodeURIComponent(orderNo)}`);
+    if (r.payflag === "2") {
+      toast("充值成功");
+      if (payTarget === "card") loadCard(true);
+      else refresh();
+      return;
+    }
+    if (r.payflag === "4") { toast("订单已过期"); return; }
+  } catch (e) { /* 继续轮询 */ }
+  payPollTimer = setTimeout(() => pollPay(orderNo, tries + 1), 2000);
+}
+
+async function confirmPay() {
+  const amt = Math.max(0, Math.min(1000, parseFloat($("#payAmount").value)));
+  if (isNaN(amt) || amt < 0.01) return toast("请输入 0.01–1000 元");
+  const btn = $("#btnPayConfirm");
+  btn.disabled = true;
+  const payWin = window.NEU ? null : window.open("about:blank", "_blank", "noopener");
+  $("#payMsg").textContent = "正在创建订单…";
+  try {
+    const r = await api(payTarget === "card" ? "/api/pay/card" : "/api/pay/net", {
+      method: "POST", body: JSON.stringify({ amount: amt }),
+    });
+    if (!r.url) throw new Error("未返回支付地址");
+    closePaySheet();
+    if (window.NEU) window.NEU.call("openPay", JSON.stringify({ url: r.url }));
+    else if (payWin) payWin.location.href = r.url;
+    else window.open(r.url, "_blank", "noopener");
+    toast("支付完成后会自动刷新");
+    pollPay(r.order_no);
+  } catch (e) {
+    if (payWin) { try { payWin.close(); } catch {} }
+    $("#payMsg").textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("#btnCardPay").addEventListener("click", () => openPaySheet("card"));
+$("#btnNetPay").addEventListener("click", () => openPaySheet("net"));
+$("#btnPayCancel").addEventListener("click", closePaySheet);
+$("#btnPayConfirm").addEventListener("click", confirmPay);
+$$("#payPresets button").forEach((b) => b.addEventListener("click", () => {
+  $("#payAmount").value = b.dataset.amt;
+  $$("#payPresets button").forEach((x) => x.classList.toggle("on", x === b));
+}));
+$("#payMask").addEventListener("click", (e) => { if (e.target === $("#payMask")) closePaySheet(); });
+
+$("#btnMail").addEventListener("click", openMail);
+$("#btnCardMail").addEventListener("click", openMail);
+$("#mailBack").addEventListener("click", closeMail);
+$("#mailRefresh").addEventListener("click", loadMail);
+
 /* ---------------- 标签页 ---------------- */
 function activateTab(name) {
   const btn = $(`.tab[data-tab="${name}"]`);
@@ -913,6 +1157,8 @@ function activateTab(name) {
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
   renderStats(name, true);
+  if (name === "card") loadCard();
+  else stopQr();
   window.scrollTo(0, 0);
 }
 $$(".tab").forEach((btn) => btn.addEventListener("click", () => {

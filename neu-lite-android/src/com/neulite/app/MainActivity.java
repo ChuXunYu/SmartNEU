@@ -22,6 +22,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 1001;
@@ -164,6 +166,39 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 免登跳转
+    public void openPay(String url, List<String[]> cookies) {
+        if (url == null || url.isEmpty()) return;
+        Intent i = new Intent(this, PaymentActivity.class);
+        i.putExtra("url", url);
+        ArrayList<String> lines = new ArrayList<>();
+        if (cookies != null) {
+            for (String[] c : cookies) {
+                if (c == null || c.length < 2) continue;
+                lines.add(c[0] + "\t" + c[1] + "\t" + (c.length > 2 ? c[2] : "")
+                        + "\t" + (c.length > 3 ? c[3] : "/"));
+            }
+        }
+        i.putStringArrayListExtra("cookies", lines);
+        runOnUiThread(() -> startActivity(i));
+    }
+
+    public void openWeb(String url, String title, List<String[]> cookies) {
+        if (url == null || url.isEmpty()) return;
+        Intent i = new Intent(this, PaymentActivity.class);
+        i.putExtra("url", url);
+        i.putExtra("title", title == null ? "网页" : title);
+        ArrayList<String> lines = new ArrayList<>();
+        if (cookies != null) {
+            for (String[] c : cookies) {
+                if (c == null || c.length < 2) continue;
+                lines.add(c[0] + "\t" + c[1] + "\t" + (c.length > 2 ? c[2] : "")
+                        + "\t" + (c.length > 3 ? c[3] : "/"));
+            }
+        }
+        i.putStringArrayListExtra("cookies", lines);
+        runOnUiThread(() -> startActivity(i));
+    }
+
     public void openSso(String target) {
         if (target == null || target.isEmpty()) return;
         if (!target.startsWith("https://")) return;

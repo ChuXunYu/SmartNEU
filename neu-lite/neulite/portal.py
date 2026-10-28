@@ -94,6 +94,8 @@ class Portal:
                         "name": str(it.get("name") or it.get("title") or ""),
                         "value": it.get("value") or it.get("data") or "",
                         "unit": it.get("unit") or "",
+                        "key": str(it.get("key") or ""),
+                        "url": str(it.get("url") or ""),
                     })
         # 去重
         uniq, seen = [], set()

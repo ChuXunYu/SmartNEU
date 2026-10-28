@@ -9,7 +9,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import auth as auth_mod, config, exports, ipgw, mock, state as state_mod
+from . import auth as auth_mod, config, ecode, exports, ipgw, mail, mock, pay, state as state_mod
 from .auth import NeedSms
 from .jwxt import Jwxt
 from .netfee import NetFee
@@ -81,6 +81,70 @@ class Ctx:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    def card_info(self) -> dict:
+        if self.demo:
+            return mock.card_info()
+        out = {"status": "ok", "name": self.st.profile.get("name", ""),
+               "student_id": self.st.profile.get("xgh", ""), "unit": self.st.profile.get("depart", "")}
+        try:
+            cards = self.portal.data_cards()
+            card = next((c for c in cards if c.get("key") == "card.balance"), None)
+            if card is None:
+                card = next((c for c in cards if "校园卡" in c.get("name", "")), None)
+            if card:
+                out["balance"] = str(card.get("value", ""))
+                out["unit"] = card.get("unit") or "元"
+        except Exception as e:
+            out["status"] = "partial"
+            out["balance_error"] = str(e)
+        try:
+            ec = ecode.fetch(self.sess)
+            ec_name = ec.pop("name", "")
+            if not out.get("name") and ec_name:
+                out["name"] = ec_name
+            ec.pop("unit", None)
+            out.update(ec)
+        except Exception as e:
+            out["status"] = "partial"
+            msg = str(e)
+            if "登录失败" in msg:
+                msg = "登录已失效，请重新登录后刷新"
+            out["qr_error"] = msg
+        out["updated_at"] = int(dt.datetime.now().timestamp() * 1000)
+        return out
+
+    def mail_info(self) -> dict:
+        if self.demo:
+            return mock.mail_info()
+        try:
+            out = mail.fetch(self.sess)
+            try:
+                cards = self.portal.data_cards()
+                card = next((c for c in cards if c.get("key") == "mail.coremailStudent"), None)
+                if card:
+                    out["portal_unread"] = str(card.get("value", ""))
+            except Exception:
+                pass
+            return out
+        except Exception as e:
+            return {"status": "partial", "items": [], "unread": 0, "error": str(e)}
+
+    def pay_card(self, amount: float) -> dict:
+        if self.demo:
+            raise RuntimeError("演示模式不充值")
+        return pay.create_card(self.sess, amount)
+
+    def pay_net(self, amount: float) -> dict:
+        if self.demo:
+            raise RuntimeError("演示模式不充值")
+        no = self.st.profile.get("xgh") or self.st.profile.get("username") or ""
+        return pay.create_net(self.sess, amount, no)
+
+    def pay_status(self, order_no: str) -> dict:
+        if self.demo:
+            return {"status": "unknown", "payflag": ""}
+        return pay.order_status(self.sess, order_no)
+
     def jwxt_status(self, probe: bool = False) -> dict:
         if self.demo:
             return {"status": "ok", "term": {}, "exams": 0, "grades": 0}
@@ -120,6 +184,12 @@ class Ctx:
             out["net"] = self.net.summary(cards)
         except Exception as e:
             out["net"] = {"status": "error", "note": str(e), "cards": [], "links": []}
+        for c in cards:
+            if c.get("key") == "card.balance" or "校园卡" in c.get("name", ""):
+                out["card_balance"] = str(c.get("value", ""))
+                out["card_unit"] = c.get("unit") or "元"
+            if c.get("key") == "mail.coremailStudent" or "未读邮件" in c.get("name", ""):
+                out["mail_unread"] = str(c.get("value", ""))
         j = {"status": "need_login", "note": ""}
         grade_cards = [c for c in cards if any(k in c.get("name", "") for k in config.GRADE_KEYWORDS)]
         exam_cards = [c for c in cards if any(k in c.get("name", "") for k in config.EXAM_KEYWORDS)]
@@ -245,6 +315,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(self.ctx.net_info())
                 if p == "/api/ipgw":
                     return self._json(self.ctx.ipgw_usage())
+                if p == "/api/card":
+                    return self._json(self.ctx.card_info())
+                if p == "/api/mail":
+                    return self._json(self.ctx.mail_info())
+                if p == "/api/pay/order":
+                    return self._json(self.ctx.pay_status(q.get("order_no", "")))
                 if p == "/api/jwxt":
                     return self._json(self.ctx.jwxt_status(probe=q.get("probe") == "1"))
                 if p == "/api/export":
@@ -329,6 +405,16 @@ class Handler(BaseHTTPRequestHandler):
                         self.ctx.auth.logout()
                         self.ctx.reload()
                     return self._json({"status": "ok"})
+                if p == "/api/pay/card":
+                    try:
+                        return self._json(self.ctx.pay_card(float(body.get("amount") or 0)))
+                    except Exception as e:
+                        return self._json({"error": str(e)}, 400)
+                if p == "/api/pay/net":
+                    try:
+                        return self._json(self.ctx.pay_net(float(body.get("amount") or 0)))
+                    except Exception as e:
+                        return self._json({"error": str(e)}, 400)
                 if p == "/api/import":
                     st = state_mod.import_bytes(json_bytes(body).encode())
                     state_mod.save(st)

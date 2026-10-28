@@ -592,3 +592,68 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 /* 选择与细节 */
 ::selection{background:var(--red);color:var(--paper)}
 
+
+
+/* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
+.tabbar{grid-template-columns:repeat(5,1fr)}
+.mailbtn{position:relative;border:1px solid var(--line);background:transparent;color:var(--ink);
+  width:30px;height:30px;font-family:var(--serif);font-size:14px;line-height:1;cursor:pointer}
+.mailbadge{position:absolute;right:-4px;top:-4px;min-width:14px;height:14px;padding:0 3px;
+  background:var(--red);color:var(--paper);font:8px/14px var(--sans);font-style:normal;text-align:center}
+.cardhero{background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:18px 16px;margin:2px 0 16px}
+.cardhero .cardwho{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cardhero .cardwho b{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:1px}
+.cardhero .cardwho span{font-size:9.5px;color:var(--muted);letter-spacing:1px}
+.cardhero .cardbal{display:flex;align-items:baseline;gap:6px;margin-top:14px}
+.cardhero .cardbal b{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1;letter-spacing:-1px}
+.cardhero .cardbal span{font-size:11px;color:var(--muted);letter-spacing:1px}
+.cardhero .cardsub{display:flex;justify-content:space-between;gap:10px;margin-top:9px;
+  font-size:9.5px;letter-spacing:.7px;color:var(--muted)}
+.cardqr{border:1px solid var(--line);padding:18px 16px 14px;text-align:center;background:var(--paper)}
+.cardqr .qrlabel{font-size:9px;letter-spacing:2.4px;color:var(--muted)}
+.cardqr #cardQr{margin:14px auto 8px;width:190px;height:190px;display:grid;place-items:center}
+.cardqr #cardQr svg{width:190px;height:190px;display:block}
+.cardqr .qrtime{font-family:var(--serif);font-size:12px;letter-spacing:1px;color:var(--ink)}
+.cardqr .qrvalid{font-size:9px;letter-spacing:.8px;color:var(--muted);margin-top:5px}
+.cardqr .qrgate{display:inline-block;margin-top:10px;padding:3px 8px;border:1px solid currentColor;
+  font-size:9px;letter-spacing:1.2px;color:var(--celadon)}
+.cardqr .qrfail{color:var(--muted);font-size:11px;padding:48px 0}
+.card-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.card-actions .btn-primary{margin:0}
+.card-note{font-size:9px;letter-spacing:.5px;color:var(--muted);margin-top:14px;line-height:1.9}
+.mailview{position:fixed;inset:0;z-index:64;background:var(--paper);overflow:auto;
+  padding:0 22px calc(28px + env(safe-area-inset-bottom))}
+.mailhead{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:16px 0 12px;background:var(--paper);border-bottom:1px solid var(--line)}
+.mailhead h3{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:2px;flex:1}
+.mailhead .navbtn{width:34px;height:30px}
+.mailmeta{font-size:9px;letter-spacing:1.2px;color:var(--muted);padding:12px 0 4px}
+.maillist{display:flex;flex-direction:column}
+.mailitem{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:14px 0;
+  border-bottom:1px solid var(--line-soft);cursor:pointer}
+.mailitem .from{font-size:11px;color:var(--ink-2);letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mailitem .date{font-size:9px;color:var(--muted);white-space:nowrap}
+.mailitem .subject{font-family:var(--serif);font-size:14px;font-weight:600;letter-spacing:.3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mailitem.unread .subject::before{content:"●";color:var(--red);font-size:8px;margin-right:6px;vertical-align:middle}
+.mailitem .flags{grid-column:1/-1;font-size:9px;color:var(--muted);letter-spacing:.4px}
+.paysheet .sheet-title{margin-bottom:18px}
+.paybalance{font-size:10px;letter-spacing:.8px;color:var(--muted);margin-bottom:16px}
+.paypresets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.paypresets button{border:1px solid var(--line);background:transparent;color:var(--ink);
+  font-family:var(--serif);font-size:16px;padding:12px 0;cursor:pointer}
+.paypresets button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.payinput{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--ink);padding:4px 0 8px;margin-bottom:18px}
+.payinput span{font-family:var(--serif);font-size:18px}
+.payinput input{flex:1;border:0;outline:0;background:transparent;color:var(--ink);
+  font-family:var(--serif);font-size:26px;min-width:0}
+.payinput em{font-style:normal;font-size:10px;color:var(--muted)}
+.paysheet .btn-switch{margin-top:8px}
+@media (max-width:400px){
+  .mailbtn{width:28px;height:28px;font-size:13px}
+  .tabbar .tab{font-size:10px;letter-spacing:1px}
+  .tabbar .tab i{font-size:8px}
+}
+
+.card-actions + .cardqr{margin-top:14px}

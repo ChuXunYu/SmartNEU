@@ -2,6 +2,8 @@ package com.neulite.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.Html;
+import android.util.Base64;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -19,16 +21,22 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -566,6 +574,10 @@ public class Api {
                         put(c, "name", name);
                         put(c, "value", first(o, "value", "data"));
                         put(c, "unit", first(o, "unit"));
+                        put(c, "key", first(o, "key"));
+                        put(c, "url", first(o, "url"));
+                        put(c, "method", first(o, "method"));
+                        put(c, "class", first(o, "class"));
                         out.put(c);
                     }
                     collectCards(v, out, depth + 1);
@@ -581,6 +593,388 @@ public class Api {
                 if (v instanceof JSONObject || v instanceof JSONArray) collectCards(v, out, depth + 1);
             }
         }
+    }
+
+    // ------------------------------------------------------- 校园卡 / 邮箱 / 缴费
+    static final String ECODE = "https://ecode.neu.edu.cn/ecode";
+    static final String MAIL_SSO = "https://mails.neu.edu.cn/coremail/cmcu_addon/dbdxsso.jsp";
+    static final String MAIL_API = "https://mails.neu.edu.cn/coremail/s";
+    static final String PAY = "https://pay.neu.edu.cn";
+    private boolean ecodeAuthed = false;
+    private String ecodeFinal = "";
+    private boolean payAuthed = false;
+
+    JSONObject httpGetJson(String url, String referer) throws Exception {
+        String text = httpGetString(url, referer);
+        if (!text.trim().startsWith("{")) throw new ApiException(-1, "接口返回非 JSON");
+        return new JSONObject(text);
+    }
+
+    String httpGetString(String url, String referer) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setInstanceFollowRedirects(false);
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(15000);
+        c.setRequestProperty("User-Agent", UA);
+        c.setRequestProperty("Accept", "application/json, text/plain, */*");
+        if (referer != null && !referer.isEmpty()) c.setRequestProperty("Referer", referer);
+        String ck = cookieHeaderFor(new URL(url));
+        if (!ck.isEmpty()) c.setRequestProperty("Cookie", ck);
+        int code = c.getResponseCode();
+        String text = readAll(c);
+        if (code >= 400) throw new ApiException(code, "HTTP " + code);
+        return text;
+    }
+
+    String httpPostForm(String url, Map<String, String> form, String referer) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : form.entrySet()) {
+            if (sb.length() > 0) sb.append('&');
+            sb.append(URLEncoder.encode(e.getKey(), "UTF-8")).append('=')
+              .append(URLEncoder.encode(e.getValue() == null ? "" : e.getValue(), "UTF-8"));
+        }
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(20000);
+        c.setRequestProperty("User-Agent", UA);
+        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        c.setRequestProperty("Accept", "application/json, text/plain, */*");
+        if (referer != null && !referer.isEmpty()) c.setRequestProperty("Referer", referer);
+        String ck = cookieHeaderFor(new URL(url));
+        if (!ck.isEmpty()) c.setRequestProperty("Cookie", ck);
+        OutputStream os = c.getOutputStream();
+        os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+        os.close();
+        int code = c.getResponseCode();
+        String text = readAll(c);
+        if (code >= 400) throw new ApiException(code, "HTTP " + code);
+        return text;
+    }
+
+    private void ecodeLogin() throws Exception {
+        if (ecodeAuthed) return;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            String[] r = httpGetFollow(ECODE + "/api/sso/login?redirect_to=/ecode", 20);
+            ecodeFinal = r[0];
+            if (r[0].startsWith(ECODE)) { ecodeAuthed = true; return; }
+            if (attempt == 0 && relogin()) continue;
+            throw new ApiException(-1, "e码通登录失败: " + r[0]);
+        }
+    }
+
+    private JSONObject ecodeGet(String path) throws Exception {
+        ecodeLogin();
+        return httpGetJson(ECODE + path, ECODE + "/");
+    }
+
+    private static JSONObject firstAttr(JSONObject res) {
+        JSONArray a = res.optJSONArray("data");
+        JSONObject o = a == null ? null : a.optJSONObject(0);
+        return o == null ? null : o.optJSONObject("attributes");
+    }
+
+    private JSONObject findCard(JSONArray all, String key, String namePart) {
+        if (all == null) return null;
+        for (int i = 0; i < all.length(); i++) {
+            JSONObject c = all.optJSONObject(i);
+            if (c == null) continue;
+            if (key.equals(str(c, "key")) || str(c, "name").contains(namePart)) return c;
+        }
+        return null;
+    }
+
+    public JSONObject cardInfo() {
+        JSONObject out = new JSONObject();
+        put(out, "status", "ok");
+        JSONObject prof = st.optJSONObject("profile");
+        if (prof == null) prof = new JSONObject();
+        put(out, "name", str(prof, "name"));
+        put(out, "student_id", str(prof, "xgh"));
+        try {
+            JSONArray all = cards();
+            JSONObject card = findCard(all, "card.balance", "校园卡");
+            if (card != null) {
+                put(out, "balance", str(card, "value"));
+                put(out, "unit", str(card, "unit"));
+            }
+        } catch (Exception e) {
+            put(out, "status", "partial");
+            put(out, "balance_error", e.getMessage());
+        }
+        try {
+            JSONObject ui = ecodeGet("/api/user-info");
+            JSONObject a = firstAttr(ui);
+            if (a != null) {
+                if (str(out, "name").isEmpty()) put(out, "name", str(a, "userName"));
+                put(out, "student_id", str(a, "userCode"));
+                put(out, "department", str(a, "unitName"));
+            }
+            JSONObject qr = ecodeGet("/api/qr-code");
+            JSONObject qa = firstAttr(qr);
+            if (qa != null) {
+                JSONObject q = new JSONObject();
+                put(q, "code", str(qa, "qrCode"));
+                put(q, "created_at", qa.optLong("createTime", 0));
+                put(q, "expires_at", qa.optLong("qrInvalidTime", 0));
+                put(out, "qr", q);
+            }
+            JSONObject ec = ecodeGet("/api/ecard-customer");
+            JSONObject ea = firstAttr(ec);
+            if (ea != null) put(out, "valid_until", str(ea, "noUseDate"));
+            JSONObject pr = ecodeGet("/api/user-priority");
+            JSONObject pa = firstAttr(pr);
+            JSONObject rules = pa == null ? null : pa.optJSONObject("ruleset");
+            JSONObject rd = rules == null ? null : rules.optJSONObject("data");
+            if (rd != null) {
+                JSONObject gate = new JSONObject();
+                put(gate, "name", str(rd, "name"));
+                put(gate, "color", str(rd, "color"));
+                put(gate, "result", str(rd, "result"));
+                put(out, "gate", gate);
+            }
+        } catch (Exception e) {
+            put(out, "status", "partial");
+            String msg = e.getMessage();
+            if (msg != null && msg.contains("登录失败")) msg = "登录已失效，请重新登录后刷新";
+            put(out, "qr_error", msg);
+            put(out, "ecode_final", ecodeFinal);
+        }
+        put(out, "updated_at", System.currentTimeMillis());
+        return out;
+    }
+
+    private String queryParam(String url, String key) {
+        try {
+            String q = new URL(url).getQuery();
+            if (q == null) return "";
+            for (String kv : q.split("&")) {
+                int i = kv.indexOf('=');
+                if (i > 0 && kv.substring(0, i).equals(key)) return kv.substring(i + 1);
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    static String xmlUnescape(String s) {
+        return s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
+                .replace("&apos;", "'").replace("&amp;", "&");
+    }
+
+    static String qpDecode(String s, String charset) {
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] b = s.getBytes(StandardCharsets.US_ASCII);
+            for (int i = 0; i < b.length; i++) {
+                if (b[i] == '=' && i + 2 < b.length) {
+                    int hi = Character.digit((char) b[i + 1], 16);
+                    int lo = Character.digit((char) b[i + 2], 16);
+                    if (hi >= 0 && lo >= 0) { out.write((hi << 4) | lo); i += 2; continue; }
+                }
+                out.write(b[i] == '_' ? ' ' : b[i]);
+            }
+            return new String(out.toByteArray(), Charset.forName(charset));
+        } catch (Exception e) { return s; }
+    }
+
+    static String decodeMime(String value) {
+        if (value == null) return "";
+        String text = xmlUnescape(value);
+        Matcher m = Pattern.compile("=\\?([^?]+)\\?([BbQq])\\?([^?]*)\\?=").matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String cs = m.group(1);
+            String enc = m.group(2).toUpperCase(Locale.US);
+            String body = m.group(3);
+            String fixed;
+            try {
+                if ("B".equals(enc)) fixed = new String(Base64.decode(body, Base64.DEFAULT), Charset.forName(cs));
+                else fixed = qpDecode(body, cs);
+            } catch (Exception e) { fixed = body; }
+            m.appendReplacement(sb, Matcher.quoteReplacement(fixed));
+        }
+        m.appendTail(sb);
+        try { return Html.fromHtml(sb.toString()).toString(); } catch (Exception e) { return sb.toString(); }
+    }
+
+    private static String xmlField(String chunk, String tag, String name) {
+        Matcher m = Pattern.compile("<" + tag + " name=\"" + Pattern.quote(name) + "\">(.*?)</" + tag + ">", Pattern.DOTALL).matcher(chunk);
+        return m.find() ? xmlUnescape(m.group(1)) : "";
+    }
+
+    private JSONArray parseMailItems(String xml) {
+        JSONArray items = new JSONArray();
+        Matcher vm = Pattern.compile("<array name=\"var\">(.*?)</array>", Pattern.DOTALL).matcher(xml);
+        if (!vm.find()) return items;
+        String var = vm.group(1);
+        Matcher om = Pattern.compile("<object>(.*?)(?=<object>|</array>)", Pattern.DOTALL).matcher(var);
+        while (om.find()) {
+            String chunk = om.group(1);
+            String id = xmlField(chunk, "string", "id");
+            if (id.isEmpty()) continue;
+            JSONObject it = new JSONObject();
+            put(it, "id", id);
+            put(it, "from", decodeMime(xmlField(chunk, "string", "from")));
+            put(it, "subject", decodeMime(xmlField(chunk, "string", "subject")));
+            put(it, "date", xmlField(chunk, "date", "sentDate"));
+            put(it, "size", xmlField(chunk, "int", "size"));
+            Matcher rm = Pattern.compile("<boolean name=\"read\">(.*?)</boolean>").matcher(chunk);
+            put(it, "unread", rm.find() && "false".equals(rm.group(1)));
+            Matcher am = Pattern.compile("<boolean name=\"attached\">(.*?)</boolean>").matcher(chunk);
+            put(it, "attached", am.find() && "true".equals(am.group(1)));
+            items.put(it);
+        }
+        return items;
+    }
+
+    public JSONObject mailInfo() {
+        JSONObject out = new JSONObject();
+        put(out, "status", "ok");
+        try {
+            JSONArray all = cards();
+            JSONObject mail = findCard(all, "mail.coremailStudent", "未读邮件");
+            if (mail != null) put(out, "portal_unread", str(mail, "value"));
+        } catch (Exception ignored) {}
+        try {
+            String[] sso = httpGetFollow(MAIL_SSO, 20);
+            if (queryParam(sso[0], "sid").isEmpty() && relogin()) {
+                sso = httpGetFollow(MAIL_SSO, 20);
+            }
+            put(out, "mail_final", sso[0]);
+            String sid = queryParam(sso[0], "sid");
+            if (sid.isEmpty()) throw new ApiException(-1, "邮箱登录失败");
+            String url = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+                    + "&func=mbox:listMessages&mbox=Inbox&limit=30&order=date&desc=1";
+            String xml = httpGetString(url, sso[0]);
+            JSONArray items = parseMailItems(xml);
+            put(out, "items", items);
+            int unread = 0;
+            for (int i = 0; i < items.length(); i++) {
+                if (items.optJSONObject(i) != null && items.optJSONObject(i).optBoolean("unread")) unread++;
+            }
+            put(out, "unread", String.valueOf(unread));
+            put(out, "web_url", sso[0]);
+        } catch (Exception e) {
+            put(out, "status", "partial");
+            put(out, "error", e.getMessage());
+        }
+        return out;
+    }
+
+    private void payLogin() throws Exception {
+        if (payAuthed) return;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            String[] r = httpGetFollow(PAY + "/drCasLogin", 20);
+            if (r[0].startsWith(PAY)) { payAuthed = true; return; }
+            if (attempt == 0 && relogin()) continue;
+            throw new ApiException(-1, "缴费平台登录失败");
+        }
+    }
+
+    static String money(double v) { return String.format(Locale.US, "%.2f", v); }
+
+    private JSONObject orderResult(String text, String project) throws Exception {
+        JSONObject j = new JSONObject(text);
+        if (!"SUCCESS".equals(j.optString("returncode"))) {
+            throw new ApiException(-1, j.optString("returnmsg", "下单失败"));
+        }
+        JSONObject tr = j.optJSONObject("payOrderTrade");
+        if (tr == null) throw new ApiException(-1, "下单响应缺少订单");
+        JSONObject out = new JSONObject();
+        put(out, "status", "ok");
+        put(out, "project", project);
+        put(out, "order_id", tr.optLong("id", 0));
+        put(out, "order_no", tr.optString("orderno"));
+        put(out, "pay_order_no", j.optString("payorderno"));
+        put(out, "amount", money(tr.optLong("orderamt", 0) / 100.0));
+        put(out, "url", PAY + "/showPayType25" + tr.optLong("id", 0) + ".html");
+        return out;
+    }
+
+    public JSONObject createCardOrder(double amount) throws Exception {
+        if (amount < 0.01 || amount > 1000) throw new ApiException(-1, "金额需在 0.01–1000 元之间");
+        payLogin();
+        Map<String, String> f = new LinkedHashMap<>();
+        f.put("payAmt", money(amount));
+        f.put("payProjectId", "264");
+        f.put("factorycode", "Z006");
+        f.put("rechargeType", "1");
+        f.put("recharge_idserial", "");
+        String text = httpPostForm(PAY + "/scardRechargeCreateOrder", f,
+                PAY + "/scardrecharge51264Z006.html");
+        return orderResult(text, "card");
+    }
+
+    public JSONObject createNetOrder(double amount) throws Exception {
+        if (amount < 0.01 || amount > 1000) throw new ApiException(-1, "金额需在 0.01–1000 元之间");
+        payLogin();
+        JSONObject prof = st.optJSONObject("profile");
+        if (prof == null) prof = new JSONObject();
+        String netNo = str(prof, "xgh");
+        if (netNo.isEmpty()) netNo = str(prof, "username");
+        if (netNo.isEmpty()) throw new ApiException(-1, "缺少上网账号");
+        Map<String, String> q = new LinkedHashMap<>();
+        q.put("netNo", netNo);
+        q.put("netType", "1");
+        q.put("factorycode", "N005");
+        String btxt = httpPostForm(PAY + "/queryNetAccBalance", q,
+                PAY + "/netdetails51247N005.html");
+        JSONObject bj = new JSONObject(btxt);
+        if (!"SUCCESS".equals(bj.optString("returncode"))) {
+            throw new ApiException(-1, bj.optString("returnmsg", "网费余额查询失败"));
+        }
+        String bal = bj.optString("netaccbal");
+        Map<String, String> f = new LinkedHashMap<>();
+        f.put("netNo", netNo);
+        f.put("netType", "1");
+        f.put("payAmt", money(amount));
+        f.put("netBalance", bal);
+        f.put("payProjectId", "247");
+        f.put("factorycode", "N005");
+        String text = httpPostForm(PAY + "/netPayprojectCreateOrder", f,
+                PAY + "/netdetails51247N005.html");
+        JSONObject out = orderResult(text, "net");
+        put(out, "net_balance", bal);
+        return out;
+    }
+
+    public JSONObject payOrderStatus(String orderNo) throws Exception {
+        payLogin();
+        Map<String, String> f = new LinkedHashMap<>();
+        f.put("page", "1");
+        f.put("rows", "50");
+        f.put("payflag", "");
+        String text = httpPostForm(PAY + "/queryOrderList", f, PAY + "/orders.html");
+        JSONObject j = new JSONObject(text);
+        JSONArray list = j.optJSONArray("payOrderList");
+        JSONObject out = new JSONObject();
+        put(out, "status", "unknown");
+        put(out, "payflag", "");
+        if (list != null) {
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject o = list.optJSONObject(i);
+                if (o != null && orderNo.equals(o.optString("orderno"))) {
+                    put(out, "status", "ok");
+                    put(out, "payflag", o.optString("payflag"));
+                    put(out, "amount", money(o.optLong("orderamt", 0) / 100.0));
+                    put(out, "create_time", o.optString("createtime"));
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    public List<String[]> webViewCookies() {
+        List<String[]> out = new ArrayList<>();
+        for (HttpCookie c : cookies.getCookieStore().getCookies()) {
+            String d = c.getDomain() == null ? "" : c.getDomain();
+            if (d.contains("neu.edu.cn")) {
+                out.add(new String[]{c.getName(), c.getValue(), d, c.getPath()});
+            }
+        }
+        return out;
     }
 
     // ----------------------------------------------------------------- jwxt
@@ -1741,6 +2135,14 @@ public class Api {
             if (containsAny(name, NET_KEYS)) net.put(c);
             if (containsAny(name, EXAM_KEYS)) examCards.put(c);
             if (containsAny(name, GRADE_KEYS)) gradeCards.put(c);
+            String key = str(c, "key");
+            if ("card.balance".equals(key) || name.contains("校园卡")) {
+                put(out, "card_balance", str(c, "value"));
+                put(out, "card_unit", str(c, "unit"));
+            }
+            if ("mail.coremailStudent".equals(key) || name.contains("未读邮件")) {
+                put(out, "mail_unread", str(c, "value"));
+            }
         }
         JSONArray netLinks = filterLinks(deep, NET_KEYS);
         JSONObject netObj = new JSONObject();

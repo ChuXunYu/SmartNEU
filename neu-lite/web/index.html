@@ -70,6 +70,7 @@
         </div>
       </div>
       <div class="hero-actions">
+        <button id="btnMail" class="mailbtn" title="邮箱">信<i id="mailBadge" class="mailbadge hidden">0</i></button>
         <button id="btnMore" class="linkbtn">更多</button>
         <button id="btnLogout" class="avatar" title="退出登录">我</button>
       </div>
@@ -142,16 +143,65 @@
 
     <!-- 网费 -->
     <section id="panel-net" class="panel hidden">
-      <div class="section-head"><h3><i>04</i>网费</h3></div>
+      <div class="section-head"><h3><i>04</i>网费</h3><button id="btnNetPay" class="textbtn" type="button">充值</button></div>
       <div id="netCards" class="netcards"></div>
       <div id="netPlan" class="netplan"></div>
       <div id="netLinksHead" class="section-head subhead"><h3><i>附</i>自助服务</h3></div>
       <div id="netLinks" class="links"></div>
       <p id="netNote" class="sub note"></p>
     </section>
+
+    <!-- 校园卡 -->
+    <section id="panel-card" class="panel hidden">
+      <div class="section-head">
+        <h3><i>05</i>校园卡</h3>
+        <span id="cardStatus" class="sub"></span>
+      </div>
+      <div id="cardHero" class="cardhero"></div>
+      <div class="card-actions">
+        <button id="btnCardPay" class="btn-primary">充值</button>
+        <button id="btnCardMail" class="btn-switch">邮箱</button>
+      </div>
+      <div id="cardQrPanel" class="cardqr"></div>
+      <p class="card-note">余额来自校园卡，二维码为 e码通通行码，10 秒自动刷新。</p>
+    </section>
   </main>
 
   <nav class="tabbar">
+    <button class="tab active" data-tab="schedule"><i>01</i><span>课表</span></button>
+    <button class="tab" data-tab="exams"><i>02</i><span>考试</span></button>
+    <button class="tab" data-tab="grades"><i>03</i><span>成绩</span></button>
+    <button class="tab" data-tab="net"><i>04</i><span>网费</span></button>
+    <button class="tab" data-tab="card"><i>05</i><span>校园卡</span></button>
+  </nav>
+</div>
+
+<div id="mailView" class="mailview hidden">
+  <div class="mailhead">
+    <button id="mailBack" class="navbtn" type="button">←</button>
+    <h3>邮箱</h3>
+    <button id="mailRefresh" class="textbtn" type="button">刷新</button>
+  </div>
+  <div id="mailMeta" class="mailmeta"></div>
+  <div id="mailList" class="maillist"></div>
+</div>
+
+<div id="payMask" class="sheetmask hidden">
+  <div class="sheet paysheet">
+    <div class="sheet-title" id="payTitle">校园卡充值</div>
+    <div id="payBalance" class="paybalance"></div>
+    <div class="paypresets" id="payPresets">
+      <button data-amt="10" type="button">10</button>
+      <button data-amt="20" type="button">20</button>
+      <button data-amt="50" type="button">50</button>
+      <button data-amt="100" type="button">100</button>
+    </div>
+    <div class="payinput"><span>¥</span><input id="payAmount" type="number" min="0.01" max="1000" step="0.01" inputmode="decimal" placeholder="自定义金额"><em>元</em></div>
+    <button id="btnPayConfirm" class="btn-primary" type="button">确认充值</button>
+    <button id="btnPayCancel" class="btn-switch" type="button">取消</button>
+    <p id="payMsg" class="msg"></p>
+  </div>
+</div>
     <button class="tab active" data-tab="schedule"><i>01</i><span>课表</span></button>
     <button class="tab" data-tab="exams"><i>02</i><span>考试</span></button>
     <button class="tab" data-tab="grades"><i>03</i><span>成绩</span></button>
@@ -175,6 +225,7 @@
 <div id="updateChip" class="updatechip hidden"><span class="spin"></span><span id="updateText">正在更新…</span></div>
 
 <div id="toast" class="toast"></div>
+<script src="qrcode.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

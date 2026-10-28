@@ -124,6 +124,22 @@ public class Bridge {
                 return ok();
             case "overview":
                 return api.overview(p.optBoolean("probe")).toString();
+            case "card":
+                return api.cardInfo().toString();
+            case "mail":
+                return api.mailInfo().toString();
+            case "payCard":
+                return api.createCardOrder(p.optDouble("amount", 0)).toString();
+            case "payNet":
+                return api.createNetOrder(p.optDouble("amount", 0)).toString();
+            case "payOrder":
+                return api.payOrderStatus(p.optString("order_no")).toString();
+            case "openPay":
+                act.openPay(p.optString("url"), api.webViewCookies());
+                return ok();
+            case "openWeb":
+                act.openWeb(p.optString("url"), p.optString("title", "网页"), api.webViewCookies());
+                return ok();
             case "schedule": {
                 String start = p.optString("start", "");
                 return api.schedule(start.isEmpty() ? null : start).toString();
