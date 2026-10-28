@@ -23,6 +23,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -35,6 +36,7 @@ public class PaymentActivity extends Activity {
     private PermissionRequest pendingPermission;
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
+    private boolean runCaptured;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -111,13 +113,22 @@ public class PaymentActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handle(request.getUrl().toString());
+                String u = request.getUrl().toString();
+                captureRunUrl(u);
+                return handle(u);
             }
 
             @Override
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                captureRunUrl(url);
                 return handle(url);
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                captureRunUrl(url);
+                super.onPageStarted(view, url, favicon);
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
@@ -180,6 +191,18 @@ public class PaymentActivity extends Activity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         if (url != null && !url.isEmpty()) web.loadUrl(url);
+    }
+
+    private void captureRunUrl(String url) {
+        if (runCaptured || url == null) return;
+        if ((url.startsWith("https://tybzhtypt.neu.edu.cn/") || url.startsWith("http://tybzhtypt.neu.edu.cn/"))
+                && url.contains("token=") && url.contains("sign=")) {
+            try {
+                SecretStore.saveRunUrl(this, url);
+                runCaptured = true;
+                Toast.makeText(this, "已绑定校园乐跑", Toast.LENGTH_SHORT).show();
+            } catch (Exception ignored) {}
+        }
     }
 
     private boolean handle(String url) {

@@ -1307,6 +1307,10 @@ runBtn.addEventListener("pointerdown", () => {
 runBtn.addEventListener("click", (e) => {
   if (runHoldTriggered) { runHoldTriggered = false; e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
+$("#runPortal").addEventListener("click", () => {
+  closeRunSheet();
+  openUrlSafe("https://personal.neu.edu.cn/", "从门户绑定校园乐跑");
+});
 $("#runOpen").addEventListener("click", () => {
   const url = $("#runUrl").value.trim().replace(/\s+/g, "");
   if (!/^https:\/\/tybzhtypt\.neu\.edu\.cn\//.test(url)) {
