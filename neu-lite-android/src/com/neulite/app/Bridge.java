@@ -146,6 +146,14 @@ public class Bridge {
                         act.readAttachments());
                 return "{\"status\":\"ok\"}";
             }
+            case "campusRunUrl":
+                return "{\"url\":" + org.json.JSONObject.quote(act.getCampusRunUrl()) + "}";
+            case "saveCampusRunUrl":
+                act.saveCampusRunUrl(p.optString("url"));
+                return ok();
+            case "clearCampusRunUrl":
+                act.clearCampusRunUrl();
+                return ok();
             case "pickAttachments":
                 act.pickAttachments();
                 return ok();

@@ -234,6 +234,18 @@
   </div>
 </div>
 
+<div id="runMask" class="sheetmask hidden">
+  <div class="sheet runsheet">
+    <div class="sheet-title">校园乐跑</div>
+    <p class="runhint">首次使用请粘贴从学校入口复制的完整链接（含 token）。链接会加密保存在本机，不上传。</p>
+    <div class="field"><textarea id="runUrl" placeholder="https://tybzhtypt.neu.edu.cn/bdlp_h5_fitness_test/view/db/#/..."></textarea></div>
+    <button id="runOpen" class="btn-primary" type="button">打开乐跑</button>
+    <button id="runClear" class="btn-switch" type="button">清除本机链接</button>
+    <button id="runCancel" class="btn-switch" type="button">取消</button>
+    <p id="runMsg" class="msg"></p>
+  </div>
+</div>
+
 <div id="passMask" class="sheetmask hidden">
   <div class="sheet passsheet">
     <div class="sheet-title" id="passTitle">加密密码</div>
@@ -264,6 +276,7 @@
   <div class="sheet">
     <div class="sheet-title">更多</div>
     <a id="linkJwxt" class="sheet-item" href="/sso?target=jwxt" target="_blank" rel="noreferrer"><span>打开教务（免登）</span><i>↗</i></a>
+    <button id="btnCampusRun" class="sheet-item" type="button"><span>校园乐跑<small>步道乐跑 · 官方 H5</small></span><i>↗</i></button>
     <button id="btnRefresh" class="sheet-item"><span>刷新数据</span><i>↻</i></button>
     <button id="btnExport" class="sheet-item"><span>导出状态文件</span><i>↗</i></button>
     <button id="btnImport" class="sheet-item hidden"><span>导入状态文件</span><i>↙</i></button>

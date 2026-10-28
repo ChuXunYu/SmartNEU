@@ -968,3 +968,11 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .attachitem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line-soft)}
 .attachitem b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attachitem span{color:var(--muted);font-size:9px;white-space:nowrap}
+
+.sheet-item span small{display:block;font-family:var(--sans);font-size:8.5px;letter-spacing:.5px;color:var(--muted);margin-top:3px;font-weight:400}
+
+.runsheet .runhint{font-size:9px;line-height:1.75;color:var(--muted);margin:0 0 10px}
+.runsheet .field{margin-bottom:10px}
+.runsheet .field textarea{width:100%;height:92px;border:1px solid var(--line);padding:9px;outline:0;
+  background:transparent;font:10px/1.6 var(--sans);color:var(--ink);resize:none;word-break:break-all}
+.runsheet .field textarea:focus{border-color:var(--ink)}

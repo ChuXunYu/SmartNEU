@@ -19,25 +19,46 @@ final class SecretStore {
     private static final String ALIAS = "neu-lite-smtp";
     private static final String PREFS = "neu-lite-secure";
     private static final String KEY = "smtp_password";
+    private static final String RUN_KEY = "campus_run_url";
 
     private SecretStore() {}
 
     static void save(Context ctx, String password) throws Exception {
-        if (password == null || password.isEmpty()) return;
+        put(ctx, KEY, password);
+    }
+
+    static String get(Context ctx) {
+        return get(ctx, KEY);
+    }
+
+    static void saveRunUrl(Context ctx, String url) throws Exception {
+        put(ctx, RUN_KEY, url);
+    }
+
+    static String getRunUrl(Context ctx) {
+        return get(ctx, RUN_KEY);
+    }
+
+    static void clearRunUrl(Context ctx) {
+        prefs(ctx).edit().remove(RUN_KEY).apply();
+    }
+
+    private static void put(Context ctx, String keyName, String value) throws Exception {
+        if (value == null || value.isEmpty()) return;
         SecretKey key = key();
         Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
         c.init(Cipher.ENCRYPT_MODE, key);
         byte[] iv = c.getIV();
-        byte[] ct = c.doFinal(password.getBytes(StandardCharsets.UTF_8));
+        byte[] ct = c.doFinal(value.getBytes(StandardCharsets.UTF_8));
         byte[] all = new byte[iv.length + ct.length];
         System.arraycopy(iv, 0, all, 0, iv.length);
         System.arraycopy(ct, 0, all, iv.length, ct.length);
-        prefs(ctx).edit().putString(KEY, Base64.encodeToString(all, Base64.NO_WRAP)).apply();
+        prefs(ctx).edit().putString(keyName, Base64.encodeToString(all, Base64.NO_WRAP)).apply();
     }
 
-    static String get(Context ctx) {
+    private static String get(Context ctx, String keyName) {
         try {
-            String raw = prefs(ctx).getString(KEY, "");
+            String raw = prefs(ctx).getString(keyName, "");
             if (raw == null || raw.isEmpty()) return "";
             byte[] all = Base64.decode(raw, Base64.NO_WRAP);
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");

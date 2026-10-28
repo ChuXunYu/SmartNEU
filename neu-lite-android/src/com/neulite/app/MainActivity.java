@@ -205,6 +205,20 @@ public class MainActivity extends Activity {
         return 0;
     }
 
+    public String getCampusRunUrl() {
+        return SecretStore.getRunUrl(this);
+    }
+
+    public void saveCampusRunUrl(String url) {
+        try {
+            SecretStore.saveRunUrl(this, url);
+        } catch (Exception ignored) {}
+    }
+
+    public void clearCampusRunUrl() {
+        SecretStore.clearRunUrl(this);
+    }
+
     public String getMailPassword() {
         return SecretStore.get(this);
     }

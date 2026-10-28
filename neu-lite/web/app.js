@@ -1243,6 +1243,87 @@ function closeSheet() { $("#sheetMask").classList.add("hidden"); }
 $("#btnMore").addEventListener("click", () => { updateCacheUsage(); $("#sheetMask").classList.remove("hidden"); });
 $("#sheetMask").addEventListener("click", (e) => { if (e.target === $("#sheetMask")) closeSheet(); });
 $("#linkJwxt").addEventListener("click", () => closeSheet());
+function getCampusRunUrl() {
+  try {
+    if (window.NEU && window.NEU.call) {
+      return JSON.parse(window.NEU.call("campusRunUrl", "{}") || "{}").url || "";
+    }
+  } catch {}
+  try { return localStorage.getItem("neu.run.url") || ""; } catch { return ""; }
+}
+
+function saveCampusRunUrl(url) {
+  try {
+    if (window.NEU && window.NEU.call) {
+      window.NEU.call("saveCampusRunUrl", JSON.stringify({ url }));
+      return;
+    }
+  } catch {}
+  try { localStorage.setItem("neu.run.url", url); } catch {}
+}
+
+function clearCampusRunUrl() {
+  try {
+    if (window.NEU && window.NEU.call) {
+      window.NEU.call("clearCampusRunUrl", "{}");
+      return;
+    }
+  } catch {}
+  try { localStorage.removeItem("neu.run.url"); } catch {}
+}
+
+function showRunSheet() {
+  closeSheet();
+  $("#runUrl").value = getCampusRunUrl();
+  $("#runMsg").textContent = "";
+  $("#runMask").classList.remove("hidden");
+  setTimeout(() => $("#runUrl").focus(), 80);
+}
+
+function openCampusRun() {
+  const url = getCampusRunUrl();
+  if (!url) { showRunSheet(); return; }
+  openUrlSafe(url, "校园乐跑");
+}
+
+function closeRunSheet() {
+  $("#runMask").classList.add("hidden");
+}
+
+$("#btnCampusRun").addEventListener("click", (e) => {
+  if (e && e.__runHeld) return;
+  openCampusRun();
+});
+let runHoldTimer = null;
+let runHoldTriggered = false;
+const runBtn = $("#btnCampusRun");
+runBtn.addEventListener("pointerdown", () => {
+  runHoldTriggered = false;
+  runHoldTimer = setTimeout(() => { runHoldTriggered = true; showRunSheet(); }, 700);
+});
+["pointerup", "pointerleave", "pointercancel"].forEach((ev) => {
+  runBtn.addEventListener(ev, () => { if (runHoldTimer) clearTimeout(runHoldTimer); });
+});
+runBtn.addEventListener("click", (e) => {
+  if (runHoldTriggered) { runHoldTriggered = false; e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+$("#runOpen").addEventListener("click", () => {
+  const url = $("#runUrl").value.trim().replace(/\s+/g, "");
+  if (!/^https:\/\/tybzhtypt\.neu\.edu\.cn\//.test(url)) {
+    $("#runMsg").textContent = "请粘贴学校官方校园乐跑链接";
+    return;
+  }
+  saveCampusRunUrl(url);
+  closeRunSheet();
+  openUrlSafe(url, "校园乐跑");
+});
+$("#runClear").addEventListener("click", () => {
+  clearCampusRunUrl();
+  $("#runUrl").value = "";
+  $("#runMsg").textContent = "已清除本机链接";
+});
+$("#runCancel").addEventListener("click", closeRunSheet);
+$("#runMask").addEventListener("click", (e) => { if (e.target === $("#runMask")) closeRunSheet(); });
 
 /* ---------------- 导出 / 状态 ---------------- */
 let passResolve = null;
