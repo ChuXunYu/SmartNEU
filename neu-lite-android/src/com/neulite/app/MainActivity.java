@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.KeyEvent;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
@@ -48,6 +49,7 @@ public class MainActivity extends Activity {
     private Api api;
     private String pendingImportPassword = "";
     private final List<Uri> attachments = new ArrayList<>();
+    private boolean backPending = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,11 +97,15 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) {
-            web.goBack();
-        } else {
-            super.onBackPressed();
-        }
+        if (backPending) return;
+        if (web == null) { super.onBackPressed(); return; }
+        backPending = true;
+        web.evaluateJavascript(
+                "(function(){try{return window.handleBack?window.handleBack():false}catch(e){return false}})()",
+                value -> {
+                    backPending = false;
+                    if (!"true".equals(value)) finishAndRemoveTask();
+                });
     }
 
     private long dirSize(File f) {
@@ -391,6 +397,15 @@ public class MainActivity extends Activity {
                 toast("无法打开文件选择器");
             }
         });
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            onBackPressed();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override

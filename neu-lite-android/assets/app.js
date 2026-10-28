@@ -1919,6 +1919,18 @@ function restoreComposeDraft() {
   $("#composeMask").classList.remove("hidden");
 }
 
+function handleBack() {
+  if (!$("#composeMask").classList.contains("hidden")) { closeCompose(); return true; }
+  if (!$("#passMask").classList.contains("hidden")) { finishPass(null); return true; }
+  if (!$("#payMask").classList.contains("hidden")) { closePaySheet(); return true; }
+  if (!$("#sheetMask").classList.contains("hidden")) { closeSheet(); return true; }
+  if (!$("#mailDetailView").classList.contains("hidden")) { closeMailDetail(); return true; }
+  if (!$("#mailView").classList.contains("hidden")) { closeMail(); return true; }
+  if (!$("#smsBox").classList.contains("hidden")) { $("#smsBox").classList.add("hidden"); return true; }
+  return false;
+}
+window.handleBack = handleBack;
+
 function closeMail() {
   closeMailDetail();
   $("#mailView").classList.add("hidden");
