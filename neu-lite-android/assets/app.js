@@ -1391,7 +1391,8 @@ function renderCard(d, cached = false) {
   }
 }
 
-async function loadCard() {
+async function loadCard(force = false) {
+  if (force) cardFetchedAt = 0;
   let cached = state.card || loadCardCache();
   if (cached && cached.qr && Number(cached.qr.expires_at || 0) <= Date.now() + 8000) {
     delete cached.qr;
@@ -1646,7 +1647,10 @@ $$("#payPresets button").forEach((b) => b.addEventListener("click", () => {
 $("#payMask").addEventListener("click", (e) => { if (e.target === $("#payMask")) closePaySheet(); });
 
 $("#btnMail").addEventListener("click", openMail);
-$("#btnCardMail").addEventListener("click", openMail);
+$("#btnCardRefresh").addEventListener("click", () => {
+  if (cardLoading) return;
+  loadCard(true);
+});
 $("#mailBack").addEventListener("click", closeMail);
 $("#mailDetailBack").addEventListener("click", closeMailDetail);
 $("#mailDetailWeb").addEventListener("click", () => openUrlSafe(mailWebUrl));
