@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.content.res.Configuration;
 import android.view.View;
@@ -22,6 +23,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -85,13 +89,10 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------ 状态导出
     public String exportState() {
         try {
-            File dir = new File(getExternalFilesDir(null), "export");
-            if (!dir.exists() && !dir.mkdirs()) throw new Exception("无法创建目录");
-            File f = new File(dir, "neu-lite-state.json");
-            try (FileOutputStream fos = new FileOutputStream(f)) {
-                fos.write(api.exportJson().getBytes(StandardCharsets.UTF_8));
-            }
-            return f.getAbsolutePath();
+            byte[] data = api.exportJson().getBytes(StandardCharsets.UTF_8);
+            String path = writeDownload("备份", "neu-lite-state", "json", "application/json", data);
+            cleanupLegacyExports();
+            return path;
         } catch (Exception e) {
             return "ERR:" + e.getMessage();
         }
@@ -100,35 +101,85 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------ CSV 导出
     public String exportCsv(String kind) {
         try {
-            String csv = "exams".equals(kind) ? api.examsCsv() : api.timetableCsv();
-            String name = ("exams".equals(kind) ? "考试安排" : api.scheduleFileName()) + ".csv";
-            return writeCsv(name, csv.getBytes(StandardCharsets.UTF_8));
+            boolean exams = "exams".equals(kind);
+            String csv = exams ? api.examsCsv() : api.timetableCsv();
+            String folder = exams ? "考试" : "课表";
+            String base = exams ? "考试安排" : api.scheduleFileName();
+            return writeDownload(folder, base, "csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             return "ERR:" + e.getMessage();
         }
     }
 
-    private String writeCsv(String name, byte[] data) throws Exception {
+    /**
+     * 所有用户可见导出统一写入：
+     * Android 10+  下载/neu-lite/{课表|考试|备份}/名称-时间.csv|json
+     * Android 9-   应用专属外部目录/exports/...
+     */
+    private String writeDownload(String folder, String base, String ext, String mime, byte[] data) throws Exception {
+        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date());
+        String name = base + "-" + stamp + "." + ext;
         if (Build.VERSION.SDK_INT >= 29) {
             ContentValues v = new ContentValues();
             v.put(MediaStore.Downloads.DISPLAY_NAME, name);
-            v.put(MediaStore.Downloads.MIME_TYPE, "text/csv");
-            v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/neu-lite");
+            v.put(MediaStore.Downloads.MIME_TYPE, mime);
+            v.put(MediaStore.Downloads.RELATIVE_PATH,
+                    Environment.DIRECTORY_DOWNLOADS + "/neu-lite/" + folder);
+            v.put(MediaStore.Downloads.IS_PENDING, 1);
             Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
             if (uri == null) throw new Exception("无法创建下载文件");
             try (OutputStream os = getContentResolver().openOutputStream(uri)) {
                 if (os == null) throw new Exception("无法写入下载文件");
                 os.write(data);
             }
-            return "下载/neu-lite/" + name;
+            ContentValues done = new ContentValues();
+            done.put(MediaStore.Downloads.IS_PENDING, 0);
+            getContentResolver().update(uri, done, null, null);
+            return "下载/neu-lite/" + folder + "/" + name;
         }
-        File dir = new File(getExternalFilesDir(null), "export");
+        File dir = new File(getExternalFilesDir(null), "exports/" + folder);
         if (!dir.exists() && !dir.mkdirs()) throw new Exception("无法创建导出目录");
         File f = new File(dir, name);
         try (FileOutputStream fos = new FileOutputStream(f)) {
             fos.write(data);
         }
         return f.getAbsolutePath();
+    }
+
+    /** 旧版把状态文件写在 Android/data/.../files/export，迁移完成后清理。 */
+    private void cleanupLegacyExports() {
+        File old = new File(getExternalFilesDir(null), "export");
+        File[] files = old.listFiles();
+        if (files != null) for (File f : files) f.delete();
+        old.delete();
+    }
+
+    /** 打开统一的导出目录。 */
+    public void openExports() {
+        runOnUiThread(() -> {
+            try {
+                if (Build.VERSION.SDK_INT >= 29) {
+                    Uri uri = DocumentsContract.buildDocumentUri(
+                            "com.android.externalstorage.documents", "primary:Download/neu-lite");
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setDataAndType(uri, "vnd.android.document/directory");
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(i);
+                } else {
+                    toast("导出文件位于：" + new File(getExternalFilesDir(null), "exports").getAbsolutePath());
+                }
+            } catch (Exception e) {
+                toast("请用系统文件管理器打开 下载/neu-lite");
+            }
+        });
+    }
+
+    /** 只清网页临时缓存，不动登录状态和用户导出文件。 */
+    public void clearWebCache() {
+        runOnUiThread(() -> {
+            if (web != null) web.clearCache(true);
+            toast("已清理网页临时缓存");
+        });
     }
 
     // ------------------------------------------------------------ 状态导入

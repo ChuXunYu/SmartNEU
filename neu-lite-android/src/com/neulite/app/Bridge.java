@@ -197,6 +197,18 @@ public class Bridge {
     }
 
     @JavascriptInterface
+    public String openExports() {
+        act.openExports();
+        return "{\"status\":\"ok\"}";
+    }
+
+    @JavascriptInterface
+    public String clearWebCache() {
+        act.clearWebCache();
+        return "{\"status\":\"ok\"}";
+    }
+
+    @JavascriptInterface
     public void openSso(String target) {
         act.openSso(target);
     }

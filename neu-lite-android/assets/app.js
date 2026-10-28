@@ -1194,6 +1194,17 @@ $("#btnExport").addEventListener("click", () => {
   location.href = "/api/export";
 });
 $("#btnImport").addEventListener("click", () => { closeSheet(); clearCache(); window.NEU && window.NEU.importState(); });
+if (window.NEU) {
+  $("#fileBlock").classList.remove("hidden");
+  $("#btnOpenExports").addEventListener("click", () => {
+    closeSheet();
+    if (window.NEU.call) window.NEU.call("openExports", "{}");
+  });
+  $("#btnClearCache").addEventListener("click", () => {
+    closeSheet();
+    if (window.NEU.call) window.NEU.call("clearWebCache", "{}");
+  });
+}
 $("#btnRefresh").addEventListener("click", () => { closeSheet(); refresh(); });
 $("#probeJwxt").addEventListener("click", probeJwxt);
 
