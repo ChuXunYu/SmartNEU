@@ -24,12 +24,13 @@ final class SmtpClient {
     static void send(String from, String password, String to, String subject, String body) throws Exception {
         Exception last = null;
         Object[][] hosts = {
-                {"smtp.mails.neu.edu.cn", 465, true},
-                {"smtp.neu.edu.cn", 465, true},
+                {"mails.neu.edu.cn", 25, "starttls"},
+                {"smtp.neu.edu.cn", 465, "ssl"},
+                {"smtp.mails.neu.edu.cn", 465, "ssl"},
         };
         for (Object[] hp : hosts) {
             try {
-                sendOne((String) hp[0], (Integer) hp[1], (Boolean) hp[2], from, password, to, subject, body);
+                sendOne((String) hp[0], (Integer) hp[1], (String) hp[2], from, password, to, subject, body);
                 return;
             } catch (Exception e) {
                 last = e;
@@ -38,25 +39,13 @@ final class SmtpClient {
         throw last == null ? new Exception("SMTP 连接失败") : last;
     }
 
-    private static void sendOne(String host, int port, boolean ssl, String from, String password,
+    private static void sendOne(String host, int port, String mode, String from, String password,
                                 String to, String subject, String body) throws Exception {
-        Socket socket;
-        if (ssl) {
-            SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
-            s.connect(new InetSocketAddress(host, port), 12000);
-            s.setSoTimeout(15000);
-            try {
-                SSLParameters p = s.getSSLParameters();
-                p.setServerNames(Collections.singletonList(new SNIHostName(host)));
-                s.setSSLParameters(p);
-            } catch (Exception ignored) {}
-            s.startHandshake();
-            socket = s;
-        } else {
-            socket = new Socket();
-            socket.connect(new InetSocketAddress(host, port), 12000);
-            socket.setSoTimeout(15000);
-        }
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress(host, port), 12000);
+        socket.setSoTimeout(15000);
+        if ("ssl".equals(mode)) socket = wrapTls(socket, host, port);
+
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         OutputStream out = socket.getOutputStream();
 
@@ -64,6 +53,18 @@ final class SmtpClient {
         write(out, "EHLO neu-lite\r\n");
         String ehlo = read(in); // 250 multi-line
         if (!ehlo.startsWith("250")) throw new Exception("SMTP EHLO: " + ehlo);
+
+        if ("starttls".equals(mode)) {
+            if (!ehlo.toUpperCase(Locale.US).contains("STARTTLS")) throw new Exception("SMTP 不支持 STARTTLS");
+            write(out, "STARTTLS\r\n");
+            expect(in, 220);
+            socket = wrapTls(socket, host, port);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            out = socket.getOutputStream();
+            write(out, "EHLO neu-lite\r\n");
+            ehlo = read(in);
+            if (!ehlo.startsWith("250")) throw new Exception("SMTP EHLO(TLS): " + ehlo);
+        }
 
         write(out, "AUTH LOGIN\r\n");
         expect(in, 334);
@@ -94,6 +95,18 @@ final class SmtpClient {
         expect(in, 250);
         write(out, "QUIT\r\n");
         socket.close();
+    }
+
+    private static Socket wrapTls(Socket plain, String host, int port) throws Exception {
+        SSLSocketFactory f = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        SSLSocket s = (SSLSocket) f.createSocket(plain, host, port, true);
+        try {
+            SSLParameters p = s.getSSLParameters();
+            p.setServerNames(Collections.singletonList(new SNIHostName(host)));
+            s.setSSLParameters(p);
+        } catch (Exception ignored) {}
+        s.startHandshake();
+        return s;
     }
 
     private static String mime(String s) {
