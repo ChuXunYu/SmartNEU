@@ -871,3 +871,8 @@ body.roomy-top .ledger{padding:9px 22px}
 body.roomy-top .updated{padding:4px 22px 5px}
 body.roomy-top #panel-schedule .section-head,
 body.roomy-top #panel-exams .section-head{margin:12px 0 9px;padding-bottom:7px}
+
+.qrloading{display:flex;align-items:center;justify-content:center;gap:8px;height:100%;color:var(--muted);
+  font-size:10px;letter-spacing:.8px}
+.qrloading i{width:12px;height:12px;border:1.5px solid var(--line);border-top-color:var(--red);
+  border-radius:50%;animation:rot .7s linear infinite;display:inline-block}

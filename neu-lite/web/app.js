@@ -1192,6 +1192,7 @@ const CARD_CACHE_KEY = "neu.card.v1";
 let qrTimer = null;
 let qrExpires = 0;
 let qrRefreshing = false;
+let pendingQr = null;
 let cardLoading = false;
 let cardFetchedAt = 0;
 let cardWarmPromise = null;
@@ -1207,7 +1208,12 @@ function loadCardCache() {
   } catch { return null; }
 }
 function saveCardCache(d) {
-  try { localStorage.setItem(CARD_CACHE_KEY, JSON.stringify({ at: Date.now(), data: d })); } catch {}
+  try {
+    // 只缓存余额等静态字段；二维码按校方 10 秒有效期管理，绝不落盘复用
+    const copy = Object.assign({}, d);
+    delete copy.qr;
+    localStorage.setItem(CARD_CACHE_KEY, JSON.stringify({ at: Date.now(), data: copy }));
+  } catch {}
 }
 function clearCardCache() {
   try { localStorage.removeItem(CARD_CACHE_KEY); } catch {}
@@ -1216,6 +1222,7 @@ function clearCardCache() {
 function stopQr() {
   if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
   qrRefreshing = false;
+  pendingQr = null;
 }
 
 function drawQr(code) {
@@ -1259,11 +1266,27 @@ function startQrTimer() {
   const tick = () => {
     const left = Math.max(0, Math.ceil((qrExpires - Date.now()) / 1000));
     const el = $("#qrTime");
-    if (el) el.textContent = qrRefreshing ? "正在刷新…" : (left > 0 ? `${left} 秒后刷新` : "正在刷新…");
-    if (left <= 2 && !qrRefreshing) refreshQr();
+    if (el) el.textContent = pendingQr ? "新码已就绪" : (qrRefreshing ? "正在刷新…" : (left > 0 ? `${left} 秒后刷新` : "正在刷新…"));
+    if (left <= 0) {
+      if (pendingQr) {
+        const q = pendingQr;
+        pendingQr = null;
+        try { applyFetchedQr(q); } catch {}
+      } else if (!qrRefreshing) {
+        refreshQr();
+      }
+    } else if (left <= 1 && !pendingQr && !qrRefreshing) {
+      refreshQr();
+    }
   };
   tick();
   qrTimer = setInterval(tick, 250);
+}
+
+function applyFetchedQr(q) {
+  state.card = Object.assign({}, state.card || {}, q);
+  saveCardCache(state.card);
+  if (!applyQr(q.qr, state.card)) throw new Error("二维码生成失败");
 }
 
 async function refreshQr() {
@@ -1272,12 +1295,15 @@ async function refreshQr() {
   try {
     const q = await api("/api/card/qr");
     if (q.status !== "ok" || !q.qr || !q.qr.code) throw new Error(q.error || "二维码刷新失败");
-    state.card = Object.assign({}, state.card || {}, q);
-    saveCardCache(state.card);
-    if (!applyQr(q.qr, state.card)) throw new Error("二维码生成失败");
+    // 预取成功后不立刻换码：先保留旧码，等旧码到期再原子替换
+    if (qrExpires > Date.now() + 300) {
+      pendingQr = q;
+    } else {
+      applyFetchedQr(q);
+    }
   } catch (e) {
     // 保留旧二维码，稍后重试，不出现白屏/空白
-    qrExpires = Date.now() + 2000;
+    qrExpires = Date.now() + 1500;
     const el = $("#qrTime");
     if (el) el.textContent = "刷新失败，正在重试";
   } finally {
@@ -1299,13 +1325,17 @@ function renderCard(d, cached = false) {
     applyQr(d.qr, d);
   } else if (!document.querySelector("#cardQr svg")) {
     ensureQrShell(d);
-    $("#cardQr").innerHTML = `<div class="qrfail">${esc(d.qr_error || "暂时无法获取二维码")}</div>`;
+    $("#cardQr").innerHTML = `<div class="qrloading"><i></i>正在获取通行码…</div>`;
     $("#qrValid").textContent = d.valid_until ? "虚拟卡有效期至 " + d.valid_until : "e码通虚拟卡";
   }
 }
 
 async function loadCard() {
   let cached = state.card || loadCardCache();
+  if (cached && cached.qr && Number(cached.qr.expires_at || 0) <= Date.now() + 8000) {
+    delete cached.qr;
+    if (state.card) delete state.card.qr;
+  }
   if (!cached && cardWarmPromise) {
     try { await cardWarmPromise; } catch {}
     cached = state.card;
