@@ -1,15 +1,21 @@
 package com.neulite.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
+import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -22,7 +28,13 @@ import java.util.ArrayList;
 
 /** 全屏支付 WebView：只承载学校缴费页，不注入任何 JS。 */
 public class PaymentActivity extends Activity {
+    private static final int REQ_WEB_PERM = 2101;
+    private static final int REQ_FILE = 2102;
     private WebView web;
+    private ValueCallback<Uri[]> fileCallback;
+    private PermissionRequest pendingPermission;
+    private GeolocationPermissions.Callback geoCallback;
+    private String geoOrigin;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -70,6 +82,8 @@ public class PaymentActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
+        s.setGeolocationEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setSupportMultipleWindows(false);
@@ -112,8 +126,59 @@ public class PaymentActivity extends Activity {
                 super.onReceivedTitle(view, title);
                 android.util.Log.d("NeuPay", "title=" + title + " url=" + view.getUrl());
             }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    callback.invoke(origin, true, false);
+                    return;
+                }
+                geoOrigin = origin;
+                geoCallback = callback;
+                requestPermissions(new String[]{
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                }, REQ_WEB_PERM);
+            }
+
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                String[] resources = request.getResources();
+                boolean wantsVideo = false;
+                for (String r : resources) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) wantsVideo = true;
+                }
+                if (!wantsVideo) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    return;
+                }
+                pendingPermission = request;
+                requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_WEB_PERM);
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                                             WebChromeClient.FileChooserParams params) {
+                if (fileCallback != null) fileCallback.onReceiveValue(null);
+                fileCallback = callback;
+                try {
+                    startActivityForResult(params.createIntent(), REQ_FILE);
+                    return true;
+                } catch (Exception e) {
+                    fileCallback = null;
+                    return false;
+                }
+            }
         });
 
+        if (url != null && url.contains("tybzhtypt.neu.edu.cn")) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
         if (url != null && !url.isEmpty()) web.loadUrl(url);
     }
 
@@ -129,6 +194,39 @@ public class PaymentActivity extends Activity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_WEB_PERM) return;
+        boolean fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (geoCallback != null) {
+            geoCallback.invoke(geoOrigin, fine || coarse, false);
+            geoCallback = null;
+            geoOrigin = null;
+        }
+        if (pendingPermission != null) {
+            if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                pendingPermission.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            } else {
+                pendingPermission.deny();
+            }
+            pendingPermission = null;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE) {
+            if (fileCallback != null) {
+                Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                fileCallback.onReceiveValue(result);
+                fileCallback = null;
+            }
+        }
+    }
+
+    @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) web.goBack();
         else super.onBackPressed();
@@ -136,6 +234,9 @@ public class PaymentActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        fileCallback = null;
+        pendingPermission = null;
+        geoCallback = null;
         if (web != null) {
             web.stopLoading();
             web.clearCache(true);
