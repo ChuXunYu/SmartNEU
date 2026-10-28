@@ -605,6 +605,9 @@ public class Api {
     static final String MAIL_API = "https://mails.neu.edu.cn/coremail/s";
     static final String PAY = "https://pay.neu.edu.cn";
     private boolean ecodeAuthed = false;
+    private boolean ecodeViaVpn = false;
+    private String ecodeBase = ECODE;
+    private String mailBase = "";
     private boolean payAuthed = false;
 
     JSONObject httpGetJson(String url, String referer) throws Exception {
@@ -660,15 +663,35 @@ public class Api {
         if (ecodeAuthed) return;
         for (int attempt = 0; attempt < 2; attempt++) {
             String[] r = httpGetFollow(ECODE + "/api/sso/login?redirect_to=/ecode", 20);
-            if (r[0].startsWith(ECODE)) { ecodeAuthed = true; return; }
+            if (r[0].startsWith(ECODE)) {
+                ecodeAuthed = true;
+                ecodeViaVpn = false;
+                ecodeBase = ECODE;
+                return;
+            }
             if (attempt == 0 && relogin()) continue;
-            throw new ApiException(-1, "e码通登录失败: " + r[0]);
+            break;
         }
+        // 校外：经 WebVPN 访问 ecode
+        if (webvpnLogin()) {
+            String base = WV + "/https/" + webvpnToken("ecode.neu.edu.cn");
+            String t = webvpnTicket(ECODE + "/api/sso/login?redirect_to=/ecode");
+            if (t != null && !t.isEmpty()) {
+                httpGetFollow(base + "/ecode/api/sso/login?redirect_to=%2Fecode&ticket="
+                        + URLEncoder.encode(t, "UTF-8"), 10);
+                ecodeViaVpn = true;
+                ecodeBase = base;
+                ecodeAuthed = true;
+                return;
+            }
+        }
+        throw new ApiException(-1, "e码通登录失败（校园网/WebVPN 均不可用）");
     }
 
     private JSONObject ecodeGet(String path) throws Exception {
         ecodeLogin();
-        return httpGetJson(ECODE + path, ECODE + "/");
+        String base = ecodeViaVpn ? ecodeBase : ECODE;
+        return httpGetJson(base + path, base + "/");
     }
 
     private static JSONObject firstAttr(JSONObject res) {
@@ -858,6 +881,23 @@ public class Api {
         return items;
     }
 
+    private String[] mailSso() throws Exception {
+        String[] sso = httpGetFollow(MAIL_SSO, 20);
+        if (queryParam(sso[0], "sid").isEmpty() && relogin()) {
+            sso = httpGetFollow(MAIL_SSO, 20);
+        }
+        if (queryParam(sso[0], "sid").isEmpty() && webvpnLogin()) {
+            String base = WV + "/https/" + webvpnToken("mails.neu.edu.cn");
+            String t = webvpnTicket(MAIL_SSO);
+            if (t != null && !t.isEmpty()) {
+                sso = httpGetFollow(base + "/coremail/cmcu_addon/dbdxsso.jsp?ticket="
+                        + URLEncoder.encode(t, "UTF-8"), 20);
+                mailBase = base;
+            }
+        }
+        return sso;
+    }
+
     public JSONObject mailInfo() {
         JSONObject out = new JSONObject();
         put(out, "status", "ok");
@@ -867,13 +907,11 @@ public class Api {
             if (mail != null) put(out, "portal_unread", str(mail, "value"));
         } catch (Exception ignored) {}
         try {
-            String[] sso = httpGetFollow(MAIL_SSO, 20);
-            if (queryParam(sso[0], "sid").isEmpty() && relogin()) {
-                sso = httpGetFollow(MAIL_SSO, 20);
-            }
+            String[] sso = mailSso();
             String sid = queryParam(sso[0], "sid");
             if (sid.isEmpty()) throw new ApiException(-1, "邮箱登录失败");
-            String url = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+            String apiBase = mailBase.isEmpty() ? MAIL_API : mailBase + "/coremail/s";
+            String url = apiBase + "?sid=" + URLEncoder.encode(sid, "UTF-8")
                     + "&func=mbox:listMessages&mbox=Inbox&limit=30&order=date&desc=1";
             String xml = httpGetString(url, sso[0]);
             JSONArray items = parseMailItems(xml);
@@ -946,6 +984,11 @@ public class Api {
         return m.find() ? m.group(1) : "";
     }
 
+    static String xmlArrayBlock(String xml, String name) {
+        Matcher m = Pattern.compile("<array name=\"" + Pattern.quote(name) + "\">(.*?)</array>", Pattern.DOTALL).matcher(xml);
+        return m.find() ? m.group(1) : "";
+    }
+
     static long xmlLong(String block, String name) {
         Matcher m = Pattern.compile("<long name=\"" + Pattern.quote(name) + "\">(.*?)</long>").matcher(block);
         if (!m.find()) return 0;
@@ -953,10 +996,11 @@ public class Api {
     }
 
     public JSONObject mailDetail(String mid) throws Exception {
-        String[] sso = httpGetFollow(MAIL_SSO, 20);
+        String[] sso = mailSso();
         String sid = queryParam(sso[0], "sid");
         if (sid.isEmpty()) throw new ApiException(-1, "邮箱登录失败");
-        String base = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+        String apiBase = mailBase.isEmpty() ? MAIL_API : mailBase + "/coremail/s";
+        String base = apiBase + "?sid=" + URLEncoder.encode(sid, "UTF-8")
                 + "&func=mbox:readMessage&mid=" + URLEncoder.encode(mid, "UTF-8");
         String meta = httpGetString(base, sso[0]);
         JSONObject out = new JSONObject();
@@ -974,7 +1018,7 @@ public class Api {
         long off = xmlLong(useBlock, "contentOffset");
         long len = xmlLong(useBlock, "contentLength");
         if (len > 0) {
-            String rawUrl = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+            String rawUrl = apiBase + "?sid=" + URLEncoder.encode(sid, "UTF-8")
                     + "&func=mbox:getMessageData&mid=" + URLEncoder.encode(mid, "UTF-8");
             byte[] raw = httpGetBytes(rawUrl, sso[0]);
             if (off >= 0 && off + len <= raw.length) {
@@ -990,7 +1034,7 @@ public class Api {
         if (text.length() > 120000) text = text.substring(0, 120000);
         put(out, "text", text);
         JSONArray atts = new JSONArray();
-        String attBlock = xmlObjectBlock(meta, "attachments");
+        String attBlock = xmlArrayBlock(meta, "attachments");
         Matcher am = Pattern.compile("<string name=\"filename\">(.*?)</string>").matcher(attBlock);
         while (am.find()) atts.put(decodeMime(xmlUnescape(am.group(1))));
         put(out, "attachments", atts);
