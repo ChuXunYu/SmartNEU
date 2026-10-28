@@ -843,17 +843,7 @@ body.card-mode #panel-card .section-head{margin:10px 0 8px}
 .grade-filter.on i{color:var(--paper-3)}
 .gradelist{margin-top:2px}
 
-/* ---------------- 考试：下一场 + 待考/已结束 ---------------- */
-.examnext{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
-  background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  padding:13px 15px;margin:2px 0 14px}
-.enn-label{font-size:8px;letter-spacing:2px;color:var(--red);margin-bottom:2px}
-.enn-co{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:.5px;margin-top:6px;line-height:1.4}
-.enn-meta{font-size:9.5px;letter-spacing:.4px;color:var(--ink-2);margin-top:5px}
-.enn-place{font-size:9px;letter-spacing:.3px;color:var(--muted);margin-top:3px}
-.enn-day{text-align:right;border-left:1px solid var(--line);padding-left:14px;min-width:66px}
-.enn-day b{display:block;font-family:var(--serif);font-size:36px;font-weight:600;line-height:1;color:var(--red);letter-spacing:-.5px;white-space:nowrap}
-.enn-day span{display:block;font-size:8px;letter-spacing:1.4px;color:var(--muted);margin-top:5px}
+/* ---------------- 考试：待考/已结束 ---------------- */
 .examgroup-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   margin:14px 0 3px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .examgroup-head h4{font-family:var(--serif);font-size:12px;font-weight:600;letter-spacing:2px}

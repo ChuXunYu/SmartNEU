@@ -736,23 +736,6 @@ function renderExams(exams) {
 
   let html = "";
   if (upcoming.length) {
-    const next = upcoming[0];
-    const p = examParts(next);
-    const d = new Date(p.date + "T00:00:00");
-    const diff = Math.round((d - new Date(today + "T00:00:00")) / 86400000);
-    const start = hmMinutes(p.start), end = hmMinutes(p.end);
-    const ongoing = diff === 0 && start != null && end != null && nowMin >= start && nowMin <= end;
-    const dayMain = ongoing ? "现在" : (diff === 0 ? "今天" : String(diff));
-    const daySub = ongoing ? "进行中" : (diff === 0 ? (p.start || "今天") : "天后");
-    html += `<div class="examnext">
-      <div class="enn-main">
-        <div class="enn-label">下一场考试</div>
-        <div class="enn-co">${esc(next.course || "")}</div>
-        <div class="enn-meta">${examDayText(next)}${p.text ? " · " + esc(p.text) : ""}</div>
-        <div class="enn-place">${esc(next.place || "地点待定")}${next.seat ? " · 座位 " + esc(next.seat) : ""}</div>
-      </div>
-      <div class="enn-day"><b>${dayMain}</b><span>${daySub}</span></div>
-    </div>`;
     html += `<div class="examgroup">
       <div class="examgroup-head"><h4>待考</h4><span>${upcoming.length} 场</span></div>
       <div class="examlist">${upcoming.map((x) => card(x, false)).join("")}</div>
