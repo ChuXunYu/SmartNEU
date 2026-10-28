@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -37,6 +38,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -802,26 +806,55 @@ public class Api {
 
     private JSONArray parseMailItems(String xml) {
         JSONArray items = new JSONArray();
-        Matcher vm = Pattern.compile("<array name=\"var\">(.*?)</array>", Pattern.DOTALL).matcher(xml);
-        if (!vm.find()) return items;
-        String var = vm.group(1);
-        Matcher om = Pattern.compile("<object>(.*?)(?=<object>|</array>)", Pattern.DOTALL).matcher(var);
-        while (om.find()) {
-            String chunk = om.group(1);
-            String id = xmlField(chunk, "string", "id");
-            if (id.isEmpty()) continue;
-            JSONObject it = new JSONObject();
-            put(it, "id", id);
-            put(it, "from", decodeMime(xmlField(chunk, "string", "from")));
-            put(it, "subject", decodeMime(xmlField(chunk, "string", "subject")));
-            put(it, "date", xmlField(chunk, "date", "sentDate"));
-            put(it, "size", xmlField(chunk, "int", "size"));
-            Matcher rm = Pattern.compile("<boolean name=\"read\">(.*?)</boolean>").matcher(chunk);
-            put(it, "unread", rm.find() && "false".equals(rm.group(1)));
-            Matcher am = Pattern.compile("<boolean name=\"attached\">(.*?)</boolean>").matcher(chunk);
-            put(it, "attached", am.find() && "true".equals(am.group(1)));
-            items.put(it);
-        }
+        try {
+            XmlPullParser p = XmlPullParserFactory.newInstance().newPullParser();
+            p.setInput(new StringReader(xml));
+            boolean inVar = false, inFlags = false;
+            int arrayDepth = 0, varDepth = -1;
+            JSONObject cur = null;
+            int ev;
+            while ((ev = p.next()) != XmlPullParser.END_DOCUMENT) {
+                if (ev == XmlPullParser.START_TAG) {
+                    String tag = p.getName();
+                    String attr = p.getAttributeValue(null, "name");
+                    if ("array".equals(tag)) {
+                        arrayDepth++;
+                        if ("var".equals(attr)) { inVar = true; varDepth = arrayDepth; }
+                        continue;
+                    }
+                    if (!inVar) continue;
+                    if ("object".equals(tag)) {
+                        if ("flags".equals(attr)) inFlags = true;
+                        else if (cur == null) cur = new JSONObject();
+                        continue;
+                    }
+                    if (cur == null) continue;
+                    if ("string".equals(tag) || "date".equals(tag) || "int".equals(tag) || "boolean".equals(tag)) {
+                        String name = attr == null ? "" : attr;
+                        String text = p.nextText();
+                        put(cur, name, text);
+                    }
+                } else if (ev == XmlPullParser.END_TAG) {
+                    String tag = p.getName();
+                    if ("object".equals(tag)) {
+                        if (inFlags) inFlags = false;
+                        else if (cur != null) { items.put(cur); cur = null; }
+                    } else if ("array".equals(tag)) {
+                        if (arrayDepth == varDepth) inVar = false;
+                        arrayDepth--;
+                    }
+                }
+            }
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it == null) continue;
+                put(it, "from", decodeMime(str(it, "from")));
+                put(it, "subject", decodeMime(str(it, "subject")));
+                put(it, "date", str(it, "sentDate"));
+                put(it, "unread", "false".equals(str(it, "read")));
+                put(it, "attached", "true".equals(str(it, "attached")));
+            }
+        } catch (Exception ignored) {}
         return items;
     }
 
@@ -908,59 +941,59 @@ public class Api {
         }
     }
 
+    static String xmlObjectBlock(String xml, String name) {
+        Matcher m = Pattern.compile("<object name=\"" + Pattern.quote(name) + "\">(.*?)</object>", Pattern.DOTALL).matcher(xml);
+        return m.find() ? m.group(1) : "";
+    }
+
+    static long xmlLong(String block, String name) {
+        Matcher m = Pattern.compile("<long name=\"" + Pattern.quote(name) + "\">(.*?)</long>").matcher(block);
+        if (!m.find()) return 0;
+        try { return Long.parseLong(m.group(1).trim()); } catch (Exception e) { return 0; }
+    }
+
     public JSONObject mailDetail(String mid) throws Exception {
         String[] sso = httpGetFollow(MAIL_SSO, 20);
         String sid = queryParam(sso[0], "sid");
         if (sid.isEmpty()) throw new ApiException(-1, "邮箱登录失败");
-        String url = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
-                + "&func=mbox:getMessageData&mid=" + URLEncoder.encode(mid, "UTF-8");
-        byte[] bytes = httpGetBytes(url, sso[0]);
-        String raw = new String(bytes, StandardCharsets.ISO_8859_1);
-        int split = raw.indexOf("\r\n\r\n");
-        int sepLen = 4;
-        if (split < 0) { split = raw.indexOf("\n\n"); sepLen = 2; }
-        if (split < 0) throw new ApiException(-1, "邮件格式无法解析");
-        String headers = raw.substring(0, split);
-        String body = raw.substring(split + sepLen);
-        String ctype = headerValue(headers, "Content-Type");
-        String boundary = paramValue(ctype, "boundary");
-        String plain = "", html = "";
-        if (!boundary.isEmpty()) {
-            String[] parts = body.split("--" + Pattern.quote(boundary));
-            for (String part : parts) {
-                int p = part.indexOf("\r\n\r\n");
-                if (p < 0) continue;
-                String ph = part.substring(0, p);
-                String pb = part.substring(p + 4);
-                String pct = headerValue(ph, "Content-Type");
-                String enc = headerValue(ph, "Content-Transfer-Encoding");
-                String cs = paramValue(pct, "charset");
-                if (cs.isEmpty()) cs = "UTF-8";
-                if (pct.toLowerCase(Locale.US).contains("text/plain") && plain.isEmpty()) {
-                    plain = decodeTransfer(pb, enc, cs);
-                } else if (pct.toLowerCase(Locale.US).contains("text/html") && html.isEmpty()) {
-                    html = decodeTransfer(pb, enc, cs);
-                }
-            }
-        } else {
-            String enc = headerValue(headers, "Content-Transfer-Encoding");
-            String cs = paramValue(ctype, "charset");
-            if (cs.isEmpty()) cs = "UTF-8";
-            plain = decodeTransfer(body, enc, cs);
-        }
-        String text = plain.trim();
-        if (text.isEmpty() && !html.isEmpty()) {
-            try { text = Html.fromHtml(html).toString().trim(); } catch (Exception ignored) {}
-        }
-        if (text.length() > 120000) text = text.substring(0, 120000);
+        String base = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+                + "&func=mbox:readMessage&mid=" + URLEncoder.encode(mid, "UTF-8");
+        String meta = httpGetString(base, sso[0]);
         JSONObject out = new JSONObject();
         put(out, "status", "ok");
         put(out, "id", mid);
-        put(out, "subject", decodeMime(headerValue(headers, "Subject")));
-        put(out, "from", decodeMime(headerValue(headers, "From")));
-        put(out, "to", decodeMime(headerValue(headers, "To")));
-        put(out, "date", headerValue(headers, "Date"));
+        put(out, "subject", decodeMime(xmlField(meta, "string", "subject")));
+        Matcher fm = Pattern.compile("<array name=\"from\">\\s*<string>(.*?)</string>", Pattern.DOTALL).matcher(meta);
+        put(out, "from", fm.find() ? decodeMime(xmlUnescape(fm.group(1))) : "");
+        put(out, "date", xmlField(meta, "date", "sentDate"));
+        String textBlock = xmlObjectBlock(meta, "text");
+        String htmlBlock = xmlObjectBlock(meta, "html");
+        String useBlock = xmlLong(textBlock, "contentLength") > 0 ? textBlock : htmlBlock;
+        String text = "";
+        String ctype = xmlField(useBlock, "string", "contentType");
+        long off = xmlLong(useBlock, "contentOffset");
+        long len = xmlLong(useBlock, "contentLength");
+        if (len > 0) {
+            String rawUrl = MAIL_API + "?sid=" + URLEncoder.encode(sid, "UTF-8")
+                    + "&func=mbox:getMessageData&mid=" + URLEncoder.encode(mid, "UTF-8");
+            byte[] raw = httpGetBytes(rawUrl, sso[0]);
+            if (off >= 0 && off + len <= raw.length) {
+                String cs = paramValue(ctype, "charset");
+                if (cs.isEmpty()) cs = "UTF-8";
+                try { text = new String(raw, (int) off, (int) len, Charset.forName(cs)); }
+                catch (Exception e) { text = new String(raw, (int) off, (int) len, StandardCharsets.UTF_8); }
+            }
+        }
+        if (ctype.toLowerCase(Locale.US).contains("text/html")) {
+            try { text = Html.fromHtml(text).toString(); } catch (Exception ignored) {}
+        }
+        if (text.length() > 120000) text = text.substring(0, 120000);
         put(out, "text", text);
+        JSONArray atts = new JSONArray();
+        String attBlock = xmlObjectBlock(meta, "attachments");
+        Matcher am = Pattern.compile("<string name=\"filename\">(.*?)</string>").matcher(attBlock);
+        while (am.find()) atts.put(decodeMime(xmlUnescape(am.group(1))));
+        put(out, "attachments", atts);
         put(out, "web_url", sso[0]);
         return out;
     }
