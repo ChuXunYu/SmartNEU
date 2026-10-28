@@ -976,3 +976,14 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .runsheet .field textarea{width:100%;height:92px;border:1px solid var(--line);padding:9px;outline:0;
   background:transparent;font:10px/1.6 var(--sans);color:var(--ink);resize:none;word-break:break-all}
 .runsheet .field textarea:focus{border-color:var(--ink)}
+
+/* 课表页顶部的校园乐跑入口 */
+.runentry{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;
+  text-align:left;padding:11px 2px 12px;margin:0 0 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.runentry-mark{width:30px;height:30px;flex:0 0 30px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--red);color:var(--red);font-family:var(--serif);font-size:14px}
+.runentry-main{display:flex;flex-direction:column;flex:1;min-width:0}
+.runentry-main b{font-family:var(--serif);font-size:13px;font-weight:600;letter-spacing:1px;color:var(--ink)}
+.runentry-main small{font-size:8.5px;color:var(--muted);letter-spacing:.4px;margin-top:2px}
+.runentry-arrow{color:var(--red);font-family:var(--serif);font-size:16px}
+.runentry:active .runentry-mark{background:var(--red);color:var(--paper)}
