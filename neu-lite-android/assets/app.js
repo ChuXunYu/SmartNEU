@@ -1744,6 +1744,13 @@ async function openWebCompose() {
   openUrlSafe(base + "#mail.compose", "写信");
 }
 
+function updateComposeReady() {
+  const from = $("#composeFrom").value.trim();
+  const password = $("#composePassword").value;
+  const to = $("#composeTo").value.trim();
+  $("#composeSend").disabled = !(from.includes("@") && password && to.includes("@"));
+}
+
 function openCompose() {
   if (!window.NEU) {
     toast("桌面端请使用网页邮箱写信");
@@ -1757,7 +1764,7 @@ function openCompose() {
   $("#composeSubject").value = "";
   $("#composeBody").value = "";
   $("#composeMsg").textContent = "";
-  $("#composeSend").disabled = false;
+  updateComposeReady();
   $("#composeMask").classList.remove("hidden");
   setTimeout(() => $("#composeFrom").focus(), 80);
 }
@@ -1881,6 +1888,13 @@ $("#mailRefresh").addEventListener("click", () => loadMail(true));
 $("#mailCompose").addEventListener("click", openCompose);
 $("#composeCancel").addEventListener("click", closeCompose);
 $("#composeSend").addEventListener("click", sendCompose);
+$("#composeFrom").addEventListener("input", updateComposeReady);
+$("#composePassword").addEventListener("input", updateComposeReady);
+$("#composeTo").addEventListener("input", updateComposeReady);
+$("#composePwdHelp").addEventListener("click", (e) => {
+  e.preventDefault();
+  openUrlSafe("https://mails.neu.edu.cn/", "申请专用密码");
+});
 $("#composeMask").addEventListener("click", (e) => { if (e.target === $("#composeMask")) closeCompose(); });
 
 /* ---------------- 标签页 ---------------- */

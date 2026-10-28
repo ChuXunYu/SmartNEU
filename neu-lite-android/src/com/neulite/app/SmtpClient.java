@@ -7,9 +7,12 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import android.util.Base64;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Locale;
 
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
@@ -33,10 +36,14 @@ final class SmtpClient {
 
     private static void sendOne(String host, int port, String from, String password,
                                 String to, String subject, String body) throws Exception {
-        SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault()
-                .createSocket();
+        SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
         socket.connect(new InetSocketAddress(host, port), 12000);
         socket.setSoTimeout(15000);
+        try {
+            SSLParameters p = socket.getSSLParameters();
+            p.setServerNames(Collections.singletonList(new SNIHostName(host)));
+            socket.setSSLParameters(p);
+        } catch (Exception ignored) {}
         socket.startHandshake();
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         OutputStream out = socket.getOutputStream();
