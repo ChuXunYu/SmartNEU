@@ -770,17 +770,21 @@ function parseGB(value, unit) {
   return n;
 }
 
-function renderNetPlan(net) {
+function fmtGB(n) {
+  if (n == null || isNaN(Number(n))) return "—";
+  return (Math.round(Number(n) * 10) / 10).toFixed(1);
+}
+
+function renderNetPlan(net, usage) {
   const box = $("#netPlan");
   if (!box) return;
   const traffic = (net.cards || []).find((c) => /流量/.test(c.name || ""));
-  let stored = null;
-  try { stored = localStorage.getItem("neu.net.usage"); } catch {}
-  const autoUsage = net.usage_gb != null && !isNaN(Number(net.usage_gb)) ? Number(net.usage_gb) : null;
-  const auto = autoUsage != null;
+  const auto = net.usage_gb != null && !isNaN(Number(net.usage_gb));
   const fixedFee = auto && typeof net.fee === "number" ? Number(net.fee) : null;
-  let usage = auto ? autoUsage : (traffic ? parseGB(traffic.value, traffic.unit) : (stored !== null ? parseFloat(stored) : null));
-  if (isNaN(usage)) usage = null;
+  if (usage == null) {
+    usage = auto ? Number(net.usage_gb) : (traffic ? parseGB(traffic.value, traffic.unit) : null);
+  }
+  if (usage == null || isNaN(Number(usage))) usage = null;
 
   const ruler = NET_TIERS.map((t, i) => {
     const span = i === 0 ? 10 : t.max === 999 ? 25 : t.max - NET_TIERS[i - 1].max;
@@ -800,16 +804,14 @@ function renderNetPlan(net) {
     : "";
 
   box.innerHTML = `<div class="plan">
-    <div class="plan-head">
-      <div>
-        <div class="plan-k">本月 IPv4 下行流量${auto ? " · 自动读取" : ""}</div>
-        <div class="plan-usage"><input id="netUsage" type="number" min="0" step="0.1" inputmode="decimal"
-          placeholder="—" value="${usage != null ? usage : ""}" ${auto ? "readonly" : ""}><span>GB</span></div>
-      </div>
-      <div class="plan-fee"><span>${auto ? "本月消费" : "预计网费"}</span><b id="netFee">—</b></div>
+    <div class="plan-summary">
+      <div class="plan-fee"><span>本月消费</span><b id="netFee">—</b></div>
+      <div class="plan-free" id="freeText">每月 10G 免费额度</div>
     </div>
+    ${auto ? "" : `<label class="plan-manual">手动填写本月流量
+      <input id="netUsage" type="number" min="0" step="0.1" inputmode="decimal" placeholder="—"
+        value="${usage != null ? usage : ""}"><span>GB</span></label>`}
     <div class="freebar"><i id="freeBar"></i></div>
-    <div class="plan-free" id="freeText">每月 10G 免费额度</div>
     <div class="ruler">${ruler}<b id="netMark" class="mark"></b></div>
     <div class="ticks">${ticks}</div>
     <div class="tiertable">${rows}</div>
@@ -818,34 +820,40 @@ function renderNetPlan(net) {
       依据《东北大学学生上网资费政策》，实际账单以 ipgw 为准。</p>
   </div>`;
 
+  let current = usage;
   const sync = () => {
-    const v = parseFloat($("#netUsage").value);
-    const gb = isNaN(v) ? null : Math.max(0, v);
-    if (!auto) {
-      try { localStorage.setItem("neu.net.usage", gb == null ? "" : String(gb)); } catch {}
+    const input = $("#netUsage");
+    if (input) {
+      const v = parseFloat(input.value);
+      current = isNaN(v) ? null : Math.max(0, v);
+      if (current != null) {
+        try { localStorage.setItem("neu.net.usage", String(current)); } catch {}
+      }
     }
     const bar = $("#freeBar");
     const mark = $("#netMark");
-    if (gb == null) {
-      bar.style.width = "0%";
-      mark.style.left = "0%";
-      $("#netFee").textContent = "—";
-      $("#freeText").textContent = "每月 10G 免费额度";
+    if (current == null) {
+      if (bar) bar.style.width = "0%";
+      if (mark) mark.style.left = "0%";
+      const feeEl = $("#netFee"); if (feeEl) feeEl.textContent = "—";
+      const freeEl = $("#freeText"); if (freeEl) freeEl.textContent = "每月 10G 免费额度";
       $$(".tierrow").forEach((r) => r.classList.remove("on"));
       return;
     }
-    const f = netFee(gb);
+    const f = netFee(current);
     const fee = fixedFee != null ? fixedFee : f.fee;
-    bar.style.width = Math.min(1, gb / NET_FREE_GB) * 100 + "%";
-    mark.style.left = Math.min(100, gb / 105 * 100) + "%";
-    $("#netFee").textContent = `¥ ${fee.toFixed(2)}`;
-    const diff = NET_FREE_GB - gb;
-    $("#freeText").textContent = diff >= 0.05
+    if (bar) bar.style.width = Math.min(1, current / NET_FREE_GB) * 100 + "%";
+    if (mark) mark.style.left = Math.min(100, current / 105 * 100) + "%";
+    const feeEl = $("#netFee"); if (feeEl) feeEl.textContent = `¥ ${fee.toFixed(2)}`;
+    const diff = NET_FREE_GB - current;
+    const freeEl = $("#freeText");
+    if (freeEl) freeEl.textContent = diff >= 0.05
       ? `10G 免费额度内，还剩 ${diff.toFixed(1)}G`
-      : diff >= -0.05 ? "10G 免费额度已用完" : `已超出免费额度 ${(gb - NET_FREE_GB).toFixed(1)}G`;
+      : diff >= -0.05 ? "10G 免费额度已用完" : `已超出免费额度 ${(current - NET_FREE_GB).toFixed(1)}G`;
     $$(".tierrow").forEach((r, i) => r.classList.toggle("on", i === f.tier));
   };
-  $("#netUsage").addEventListener("input", sync);
+  const input = $("#netUsage");
+  if (input) input.addEventListener("input", sync);
   sync();
 }
 
@@ -854,14 +862,21 @@ function renderNet(net) {
   const links = $("#netLinks");
   if (!net) { cards.innerHTML = ""; return; }
   const traffic = (net.cards || []).find((c) => /流量/.test(c.name || ""));
-  const list = (net.cards || []).filter((c) => c !== traffic);
-  cards.innerHTML = list.length
-    ? list.map((c, i) => `<div class="netcard full">
-        <div class="k">${esc(c.name)}</div>
-        <div class="v">${esc(String(c.value ?? "—"))}<small>${esc(c.unit || "")}</small></div>
-      </div>`).join("")
-    : "";
-  renderNetPlan(net);
+  const balance = (net.cards || []).find((c) => c !== traffic && /余额/.test(c.name || ""))
+    || (net.cards || []).find((c) => c !== traffic);
+  const auto = net.usage_gb != null && !isNaN(Number(net.usage_gb));
+  const usage = auto ? Number(net.usage_gb) : (traffic ? parseGB(traffic.value, traffic.unit) : null);
+  cards.innerHTML = `<div class="netcard">
+      <div class="k">网费余额</div>
+      <div class="v">${esc(String(balance?.value ?? "—"))}<small>${esc(balance?.unit || "元")}</small></div>
+      <div class="t">账户可用余额</div>
+    </div>
+    <div class="netcard">
+      <div class="k">本月已用</div>
+      <div class="v">${fmtGB(usage)}<small>GB</small></div>
+      <div class="t">IPv4 下行流量</div>
+    </div>`;
+  renderNetPlan(net, usage);
   links.innerHTML = (net.links || []).slice(0, 6)
     .map((l) => `<a class="link" href="${esc(ssoHref(l.url))}" target="_blank" rel="noreferrer">${esc(l.name || l.url)}</a>`)
     .join("");
