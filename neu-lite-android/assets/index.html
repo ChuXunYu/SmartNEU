@@ -203,6 +203,16 @@
   <div id="mailList" class="maillist"></div>
 </div>
 
+<div id="passMask" class="sheetmask hidden">
+  <div class="sheet passsheet">
+    <div class="sheet-title" id="passTitle">加密密码</div>
+    <p class="passhint" id="passHint">密码只用于本次加密/解密，不会保存。</p>
+    <div class="field"><input id="passInput" type="password" autocomplete="new-password" placeholder="输入密码"></div>
+    <button id="passOk" class="btn-primary" type="button">确定</button>
+    <button id="passCancel" class="btn-switch" type="button">取消</button>
+  </div>
+</div>
+
 <div id="payMask" class="sheetmask hidden">
   <div class="sheet paysheet">
     <div class="sheet-title" id="payTitle">校园卡充值</div>
@@ -228,10 +238,11 @@
     <button id="btnImport" class="sheet-item hidden"><span>导入状态文件</span><i>↙</i></button>
     <div id="fileBlock" class="fileblock hidden">
       <div class="filehead">文件位置</div>
-      <p class="filehint">导出统一保存在 <b>下载/neu-lite</b>，按用途分文件夹；App 内部登录状态与临时缓存卸载即清除；根目录下旧版 CSV 可直接删除，不影响运行。备份 JSON 含登录状态，请勿外发。数据缓存上限 2MB，邮箱正文保留最近 30 封，每类导出保留最近 30 份；网页缓存超 24MB 自动清理。</p>
+      <p class="filehint">导出统一保存在 <b>下载/neu-lite</b>，按用途分文件夹；App 内部登录状态与临时缓存卸载即清除；根目录下旧版 CSV 可直接删除，不影响运行。备份 JSON 含登录状态，请勿外发。数据缓存上限 2MB，邮箱正文保留最近 30 封，每类导出保留最近 30 份；网页缓存超 24MB 自动清理。导出默认 AES 加密，密码不保存。</p>
       <div class="filetree">下载/neu-lite/<br>├─ 课表/<br>├─ 考试/<br>└─ 备份/</div>
       <p id="cacheUsage" class="fileusage"></p>
       <button id="btnOpenExports" class="sheet-item"><span>打开导出文件夹</span><i>↗</i></button>
+      <button id="btnPlainCsv" class="sheet-item"><span>导出明文 CSV（兼容 Excel/WakeUP）</span><i>!</i></button>
       <button id="btnClearCache" class="sheet-item"><span>清理网页临时缓存</span><i>⌫</i></button>
     </div>
     <button id="btnLogout2" class="sheet-item danger"><span>退出登录</span><i>⎋</i></button>

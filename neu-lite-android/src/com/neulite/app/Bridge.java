@@ -185,8 +185,13 @@ public class Bridge {
     }
 
     @JavascriptInterface
-    public String exportState() {
-        return act.exportState();
+    public String exportState(String password) {
+        return act.exportState(password);
+    }
+
+    @JavascriptInterface
+    public String exportEncrypted(String kind, String password) {
+        return act.exportEncrypted(kind, password);
     }
 
     @JavascriptInterface
@@ -195,8 +200,13 @@ public class Bridge {
     }
 
     @JavascriptInterface
-    public void importState() {
-        act.requestImport();
+    public String exportPlainCsvAll() {
+        return act.exportPlainCsvAll();
+    }
+
+    @JavascriptInterface
+    public void importState(String password) {
+        act.requestImport(password);
     }
 
     @JavascriptInterface

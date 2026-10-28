@@ -910,3 +910,11 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .filetree{font-family:var(--mono,monospace);font-size:9px;line-height:1.8;color:var(--ink-2);
   background:var(--cream);border-left:2px solid var(--red);padding:8px 10px;margin-bottom:4px}
 .fileusage{font-size:8.5px;color:var(--muted);letter-spacing:.4px;margin:0 0 4px}
+
+/* 加密导出密码框 */
+.passsheet .passhint{font-size:9.5px;line-height:1.8;color:var(--muted);letter-spacing:.3px;margin:0 0 14px}
+.passsheet .field{margin-bottom:14px}
+.passsheet .field input{width:100%;border:1px solid var(--line);padding:11px;outline:0;background:transparent;
+  font:14px var(--sans);color:var(--ink);letter-spacing:1px}
+.passsheet .field input:focus{border-color:var(--ink)}
+.passsheet .btn-primary{margin-bottom:8px}

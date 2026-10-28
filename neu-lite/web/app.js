@@ -1239,18 +1239,67 @@ $("#sheetMask").addEventListener("click", (e) => { if (e.target === $("#sheetMas
 $("#linkJwxt").addEventListener("click", () => closeSheet());
 
 /* ---------------- 导出 / 状态 ---------------- */
-$("#btnExportKb").addEventListener("click", () => exportCsv("timetable"));
-$("#btnExportExams").addEventListener("click", () => exportCsv("exams"));
-$("#btnExport").addEventListener("click", () => {
-  closeSheet();
-  if (window.NEU) {
-    const p = window.NEU.exportState();
-    toast(String(p).startsWith("ERR:") ? p : "已导出：" + p);
+let passResolve = null;
+let passAllowEmpty = false;
+
+function askPassword(title, hint, allowEmpty = false) {
+  return new Promise((resolve) => {
+    passResolve = resolve;
+    passAllowEmpty = allowEmpty;
+    $("#passTitle").textContent = title;
+    $("#passHint").textContent = hint;
+    $("#passInput").value = "";
+    $("#passMask").classList.remove("hidden");
+    setTimeout(() => $("#passInput").focus(), 60);
+  });
+}
+function finishPass(value) {
+  if (!passResolve) return;
+  const fn = passResolve;
+  passResolve = null;
+  $("#passMask").classList.add("hidden");
+  $("#passInput").value = "";
+  fn(value);
+}
+$("#passOk").addEventListener("click", () => {
+  const v = $("#passInput").value;
+  if (!v && !passAllowEmpty) return toast("请输入密码");
+  finishPass(v);
+});
+$("#passCancel").addEventListener("click", () => finishPass(null));
+$("#passMask").addEventListener("click", (e) => { if (e.target === $("#passMask")) finishPass(null); });
+$("#passInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#passOk").click(); });
+
+async function encryptedExport(kind) {
+  if (!window.NEU) {
+    toast("桌面端导出为明文浏览器下载");
+    location.href = kind === "exams" ? "/api/export/exams.csv" : "/api/export/timetable.csv";
     return;
   }
-  location.href = "/api/export";
+  const pass = await askPassword("设置导出密码", "文件会用 AES-256 加密；密码只用于本次导出，不会保存。");
+  if (pass == null) return;
+  const r = String(kind === "state"
+    ? window.NEU.exportState(pass)
+    : window.NEU.exportEncrypted(kind, pass));
+  toast(r.startsWith("ERR") ? r : "已加密导出：" + r);
+}
+
+function exportPlainCsvAll() {
+  if (!window.NEU) { toast("仅 Android 客户端支持"); return; }
+  const r = String(window.NEU.exportPlainCsvAll() || "");
+  toast(r.startsWith("ERR") ? r : "已导出明文：" + r);
+}
+
+$("#btnExportKb").addEventListener("click", () => encryptedExport("timetable"));
+$("#btnExportExams").addEventListener("click", () => encryptedExport("exams"));
+$("#btnExport").addEventListener("click", () => { closeSheet(); encryptedExport("state"); });
+$("#btnImport").addEventListener("click", async () => {
+  closeSheet();
+  if (!window.NEU) return;
+  const pass = await askPassword("导入密码", "输入导出时设置的密码；旧版明文备份可留空。", true);
+  if (pass == null) return;
+  window.NEU.importState(pass);
 });
-$("#btnImport").addEventListener("click", () => { closeSheet(); clearCache(); window.NEU && window.NEU.importState(); });
 if (window.NEU) {
   $("#fileBlock").classList.remove("hidden");
   $("#btnOpenExports").addEventListener("click", () => {

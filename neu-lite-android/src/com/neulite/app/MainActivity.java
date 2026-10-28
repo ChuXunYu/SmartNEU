@@ -18,6 +18,7 @@ import android.webkit.WebViewClient;
 import android.webkit.WebView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -36,6 +37,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 1001;
     private WebView web;
     private Api api;
+    private String pendingImportPassword = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,15 +114,41 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 状态导出
-    public String exportState() {
+    public String exportState(String password) {
         try {
-            byte[] data = api.exportJson().getBytes(StandardCharsets.UTF_8);
-            String path = writeDownload("备份", "neu-lite-state", "json", "application/json", data);
+            byte[] data = CryptoBox.encrypt(api.exportJson().getBytes(StandardCharsets.UTF_8), password);
+            String path = writeDownload("备份", "neu-lite-state", "neubak", "application/octet-stream", data);
             cleanupLegacyExports();
             return path;
         } catch (Exception e) {
             return "ERR:" + e.getMessage();
         }
+    }
+
+    /** 加密导出课表/考试。文件扩展名 .neucsv，只有本 App 输入密码才能还原。 */
+    public String exportEncrypted(String kind, String password) {
+        try {
+            boolean exams = "exams".equals(kind);
+            boolean state = "state".equals(kind);
+            String text = state ? api.exportJson() : (exams ? api.examsCsv() : api.timetableCsv());
+            String folder = state ? "备份" : (exams ? "考试" : "课表");
+            String base = state ? "neu-lite-state" : (exams ? "考试安排" : api.scheduleFileName());
+            String ext = state ? "neubak" : "neucsv";
+            byte[] data = CryptoBox.encrypt(text.getBytes(StandardCharsets.UTF_8), password);
+            String path = writeDownload(folder, base, ext, "application/octet-stream", data);
+            if (state) cleanupLegacyExports();
+            return path;
+        } catch (Exception e) {
+            return "ERR:" + e.getMessage();
+        }
+    }
+
+    /** 兼容 Excel / WakeUP 的显式明文 CSV，两个文件一起导出。 */
+    public String exportPlainCsvAll() {
+        String a = exportCsv("timetable");
+        String b = exportCsv("exams");
+        if (a.startsWith("ERR:") || b.startsWith("ERR:")) return a.startsWith("ERR:") ? a : b;
+        return "课表：" + a + "；考试：" + b;
     }
 
     // ------------------------------------------------------------ CSV 导出
@@ -248,7 +276,8 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 状态导入
-    public void requestImport() {
+    public void requestImport(String password) {
+        pendingImportPassword = password == null ? "" : password;
         runOnUiThread(() -> {
             Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);
@@ -269,15 +298,26 @@ public class MainActivity extends Activity {
         if (uri == null) return;
         try (InputStream in = getContentResolver().openInputStream(uri)) {
             if (in == null) throw new Exception("无法读取文件");
-            BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null) sb.append(line);
-            api.importJson(sb.toString());
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            byte[] bytes = out.toByteArray();
+            if (CryptoBox.isEncrypted(bytes)) {
+                if (pendingImportPassword.isEmpty()) throw new Exception("这是加密备份，请输入导出时设置的密码");
+                bytes = CryptoBox.decrypt(bytes, pendingImportPassword);
+            }
+            api.importJson(new String(bytes, StandardCharsets.UTF_8));
             toast("导入成功");
-            if (web != null) web.reload();
+            if (web != null) {
+                web.evaluateJavascript("try{localStorage.clear()}catch(e){}", value -> {
+                    if (web != null) web.reload();
+                });
+            }
         } catch (Exception e) {
             toast("导入失败: " + e.getMessage());
+        } finally {
+            pendingImportPassword = "";
         }
     }
 
