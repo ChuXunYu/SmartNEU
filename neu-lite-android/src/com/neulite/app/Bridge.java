@@ -182,6 +182,9 @@ public class Bridge {
             case "openWeb":
                 act.openWeb(p.optString("url"), p.optString("title", "网页"), api.webViewCookies());
                 return ok();
+            case "openSsoWeb":
+                act.openSsoWeb(p.optString("url"), p.optString("title", "网页"));
+                return ok();
             case "schedule": {
                 String start = p.optString("start", "");
                 return api.schedule(start.isEmpty() ? null : start).toString();

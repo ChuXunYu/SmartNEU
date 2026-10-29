@@ -499,6 +499,18 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> startActivity(i));
     }
 
+    /** 先换 CAS ticket，再在应用内打开，避免门户跳到扫码登录页。 */
+    public void openSsoWeb(String target, String title) {
+        if (target == null || target.isEmpty()) return;
+        if (!target.startsWith("https://")) { openWeb(target, title, api.webViewCookies()); return; }
+        runOnUiThread(() -> Toast.makeText(this, "正在获取免登票据…", Toast.LENGTH_SHORT).show());
+        new Thread(() -> {
+            String resolved = api.ssoUrl(target);
+            final String url = (resolved == null || resolved.isEmpty()) ? target : resolved;
+            openWeb(url, title, api.webViewCookies());
+        }).start();
+    }
+
     public void openSso(String target) {
         if (target == null || target.isEmpty()) return;
         if (!target.startsWith("https://")) return;
