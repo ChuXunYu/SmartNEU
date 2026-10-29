@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -61,7 +62,19 @@ final class RunBinder {
             s.setDomStorageEnabled(true);
             s.setDatabaseEnabled(true);
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-            CookieManager.getInstance().setAcceptCookie(true);
+            CookieManager cm = CookieManager.getInstance();
+            cm.setAcceptCookie(true);
+            // 清除数据/首次登录后，隐藏 WebView 的 CookieStore 是空的；把 Api 的会话 Cookie 注入。
+            for (String[] c : api.webViewCookies()) {
+                if (c == null || c.length < 2) continue;
+                String domain = c.length > 2 ? c[2] : "";
+                String path = c.length > 3 ? c[3] : "/";
+                if (domain == null || domain.isEmpty()) continue;
+                String host = domain.startsWith(".") ? domain.substring(1) : domain;
+                String cookie = c[0] + "=" + c[1] + "; Domain=" + domain + "; Path=" + path + "; Secure";
+                cm.setCookie("https://" + host + path, cookie);
+            }
+            cm.flush();
 
             web.setWebViewClient(new WebViewClient() {
                 @Override
@@ -102,6 +115,7 @@ final class RunBinder {
 
     private void inspect(String url) {
         if (done || url == null) return;
+        Log.d("RunBinder", "url=" + url + " step=" + step);
         if (url.startsWith("https://tybzhtypt.neu.edu.cn/") || url.startsWith("http://tybzhtypt.neu.edu.cn/")) {
             if (url.contains("token=") && url.contains("sign=")) {
                 try {
@@ -169,6 +183,7 @@ final class RunBinder {
     }
 
     private void finish(boolean ok) {
+        Log.d("RunBinder", "finish ok=" + ok + " step=" + step);
         if (done) return;
         done = true;
         ui.removeCallbacksAndMessages(null);
