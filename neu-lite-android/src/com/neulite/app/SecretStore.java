@@ -20,6 +20,7 @@ final class SecretStore {
     private static final String PREFS = "neu-lite-secure";
     private static final String KEY = "smtp_password";
     private static final String RUN_KEY = "campus_run_url";
+    private static final String LOGIN_KEY = "login_password";
 
     private SecretStore() {}
 
@@ -41,6 +42,18 @@ final class SecretStore {
 
     static void clearRunUrl(Context ctx) {
         prefs(ctx).edit().remove(RUN_KEY).apply();
+    }
+
+    static void saveLoginPassword(Context ctx, String password) throws Exception {
+        put(ctx, LOGIN_KEY, password);
+    }
+
+    static String getLoginPassword(Context ctx) {
+        return get(ctx, LOGIN_KEY);
+    }
+
+    static void clearLoginPassword(Context ctx) {
+        prefs(ctx).edit().remove(LOGIN_KEY).apply();
     }
 
     private static void put(Context ctx, String keyName, String value) throws Exception {
@@ -74,12 +87,8 @@ final class SecretStore {
     }
 
     static void clear(Context ctx) {
+        // 只删除 SMTP 值；同一把 Keystore 密钥还用于登录密码/乐跑链接。
         prefs(ctx).edit().remove(KEY).apply();
-        try {
-            KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
-            ks.load(null);
-            if (ks.containsAlias(ALIAS)) ks.deleteEntry(ALIAS);
-        } catch (Exception ignored) {}
     }
 
     private static SharedPreferences prefs(Context ctx) {

@@ -32,9 +32,12 @@ class Auth:
         if code == "1":
             self._apply_login(d, username)
             if remember:
-                self.st.remember = {"username": username, "password_removed": None,
+                # 不保存明文密码；桌面端只记住账号展示信息。
+                self.st.remember = {"username": username,
                                     "name": self.st.profile.get("name", ""),
                                     "xgh": self.st.profile.get("xgh", "")}
+            else:
+                self.st.remember = {}
             state_mod.save(self.st)
             return {"status": "ok", "profile": self.st.profile}
         if code == "3":
@@ -46,10 +49,7 @@ class Auth:
         raise ApiError(code or -1, str(res.get("m") or d.get("m") or "登录失败"))
 
     def quick_login(self) -> dict:
-        cred = self.st.remember or {}
-        if not cred.get("username") or not cred.get("password"):
-            raise ApiError(-1, "本机没有保存账号密码")
-        return self.login(cred["username"], cred["password"], remember=True)
+        raise ApiError(-1, "出于安全考虑，桌面端不保存明文密码，请重新输入")
 
     def send_sms(self) -> dict:
         return self.s.post(config.SMS_SEND, {
@@ -101,10 +101,6 @@ class Auth:
         try:
             return self.check()
         except SessionExpired:
-            cred = self.st.remember or {}
-            if cred.get("username") and cred.get("password"):
-                self.login(cred["username"], cred["password"])
-                return self.check()
             raise
 
     # ---- 登出 ------------------------------------------------------------

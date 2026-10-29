@@ -89,6 +89,7 @@ public class Api {
         public SessionExpired() { super(10013, "会话失效"); }
     }
 
+    private final Context ctx;
     private final SharedPreferences sp;
     JSONObject st;
     private final CookieManager cookies;
@@ -103,6 +104,7 @@ public class Api {
     private long linksAt = 0;
 
     public Api(Context ctx) {
+        this.ctx = ctx;
         sp = ctx.getSharedPreferences("neu", Context.MODE_PRIVATE);
         cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
         CookieHandler.setDefault(cookies);
@@ -125,6 +127,20 @@ public class Api {
         if (!st.has("profile")) put(st, "profile", new JSONObject());
         if (!st.has("endpoints")) put(st, "endpoints", new JSONObject());
         if (!st.has("cookies")) put(st, "cookies", new JSONArray());
+        migrateSecrets();
+    }
+
+    /** 旧版 remember.password 从 state 迁移到 Android Keystore，并从 state 删除。 */
+    private void migrateSecrets() {
+        JSONObject rem = st.optJSONObject("remember");
+        if (rem == null || !rem.has("password")) return;
+        String p = rem.optString("password", "");
+        try {
+            if (!p.isEmpty()) SecretStore.saveLoginPassword(ctx, p);
+        } catch (Exception ignored) {}
+        rem.remove("password");
+        put(st, "remember", rem);
+        sp.edit().putString("state", st.toString()).apply();
     }
 
     public void save() {
@@ -239,11 +255,7 @@ public class Api {
         out.put("m", str(env, "m"));
         Object d = env.opt("d");
         if (d instanceof String && !((String) d).isEmpty()) {
-            try {
-                out.put("d", new JSONObject(new String(Crypto.decrypt((String) d), StandardCharsets.UTF_8)));
-            } catch (Exception ex) {
-                out.put("d", d);
-            }
+            out.put("d", d);
         } else if (d != null && d != JSONObject.NULL) {
             out.put("d", d);
         } else {
@@ -279,7 +291,7 @@ public class Api {
         JSONObject rem = st.optJSONObject("remember");
         if (rem == null) throw new ApiException(-1, "本机没有保存账号密码");
         String u = str(rem, "username");
-        String p = str(rem, "password");
+        String p = SecretStore.getLoginPassword(ctx);
         if (u.isEmpty() || p.isEmpty()) throw new ApiException(-1, "本机没有保存账号密码");
         return login(u, p, true);
     }
@@ -288,7 +300,7 @@ public class Api {
         JSONObject rem = st.optJSONObject("remember");
         if (rem == null) return false;
         String u = str(rem, "username");
-        String p = str(rem, "password");
+        String p = SecretStore.getLoginPassword(ctx);
         if (u.isEmpty() || p.isEmpty()) return false;
         try {
             login(u, p, true);
@@ -312,12 +324,15 @@ public class Api {
         if ("1".equals(code)) {
             applyLogin(d, user);
             if (remember) {
+                try { SecretStore.saveLoginPassword(ctx, pass); } catch (Exception ignored) {}
                 JSONObject r = new JSONObject();
                 r.put("username", user);
-                r.put("password_removed", true);
                 r.put("name", str(d, "name"));
                 r.put("xgh", str(d, "xgh"));
                 put(st, "remember", r);
+            } else {
+                st.remove("remember");
+                SecretStore.clearLoginPassword(ctx);
             }
             save();
             JSONObject out = new JSONObject();
@@ -2423,6 +2438,7 @@ public class Api {
         st = obj;
         invalidateJwxtCache();
         if (str(st, "imei").isEmpty()) st.put("imei", UUID.randomUUID().toString());
+        migrateSecrets();
         save();
         syncCookies(true);
     }

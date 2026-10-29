@@ -1135,7 +1135,7 @@ function maskUsername(value) {
 }
 
 function renderLoginMode(session) {
-  const saved = session && session.saved_user;
+  const saved = session && session.saved_user && session.password_saved !== false;
   $("#smsBox").classList.add("hidden");
   $("#loginMsg").textContent = "";
   $("#savedLogin").classList.toggle("hidden", !saved);

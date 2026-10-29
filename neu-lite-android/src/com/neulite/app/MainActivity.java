@@ -55,9 +55,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         api = new Api(this);
-        if (getIntent() != null && getIntent().getBooleanExtra("webview_debug", false)) {
-            WebView.setWebContentsDebuggingEnabled(true);
-        }
         boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
         int paper = dark ? 0xFF17140F : 0xFFF4EEE2;

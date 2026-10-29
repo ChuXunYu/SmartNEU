@@ -1,7 +1,6 @@
-"""可移植状态：imei（设备指纹）+ 会话票据 + Cookie。
+"""本地会话状态：设备标识、会话票据与 Cookie。
 
-把 state.json 复制到新设备即可保持同一设备指纹与会话，
-不会触发短信二次验证（服务端认的是 imei 与 TGT）。
+state.json 只保存在本机，必须排除在版本控制之外。
 """
 from __future__ import annotations
 
@@ -24,7 +23,7 @@ class State:
     ck_vl: str = ""
     profile: dict = field(default_factory=dict)
     cookies: list = field(default_factory=list)   # [{name,value,domain,path}]
-    remember: dict = field(default_factory=dict)  # {username,password} 可选
+    remember: dict = field(default_factory=dict)  # 仅保存展示用账号信息，不保存密码
     endpoints: dict = field(default_factory=dict) # 运行时发现的教务/网费端点
     updated_at: str = ""
 
@@ -46,6 +45,8 @@ def load(path: str = config.STATE_FILE) -> State:
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     st = State(**{k: v for k, v in raw.items() if k in State.__dataclass_fields__})
+    if st.remember:
+        st.remember.pop("password", None)
     st.ensure_imei()
     return st
 

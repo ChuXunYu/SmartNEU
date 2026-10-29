@@ -1,7 +1,7 @@
 """RSA 信封：与 App 的 ZhilinRsaHelper 完全一致。
 
 - 请求：JSON(UTF-8) -> 117 字节分块 -> RSA/PKCS#1 v1.5 -> 拼接 -> Base64
-- 响应：Base64 -> 128 字节分块 -> RSA 解密 -> 拼接
+- 只保留服务端公钥；客户端不保存任何 RSA 私钥
 """
 from __future__ import annotations
 
@@ -19,10 +19,7 @@ from . import config
 PUBLIC_PEM = b"""-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDGxnwlytGO2nB03669B1lllpHhXVsUoDNgKIoDKm/P0cNZXs+DvFzt3DoVKj4Gw+YTm6unbWcG58zy1Yk+nsFMDhZ82r+phOL/l7r33AdWNfG2law1WGotJ9JV/v49LcxQV+14QNh6eckcjixVNE7cJz8qXgPfjzJTukEk2gat5wIDAQAB
 -----END PUBLIC KEY-----"""
-PRIVATE_PEM = b"""[REDACTED PRIVATE KEY]"""
-
 PUB = serialization.load_pem_public_key(PUBLIC_PEM)
-PRIV = serialization.load_pem_private_key(PRIVATE_PEM, password=None)
 
 # 3.1.8 实际发送字符串秒级时间戳；如需兼容 3.1.5 写法可改为 "millis"
 TIMESTAMP_MODE = "seconds"
@@ -38,14 +35,6 @@ def encrypt_with(key, plain: bytes) -> str:
 
 def encrypt(plain: bytes) -> str:
     return encrypt_with(PUB, plain)
-
-
-def decrypt(b64: str) -> bytes:
-    raw = base64.b64decode(b64)
-    size = PRIV.key_size // 8
-    if not raw or len(raw) % size:
-        raise ValueError("密文长度不是 %d 的倍数: %d" % (size, len(raw)))
-    return b"".join(PRIV.decrypt(raw[i:i + size], padding.PKCS1v15()) for i in range(0, len(raw), size))
 
 
 def now_ts() -> str:

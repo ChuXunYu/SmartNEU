@@ -185,7 +185,7 @@ def main():
     p = sub.add_parser("login", help="登录")
     p.add_argument("--username")
     p.add_argument("--password")
-    p.add_argument("--remember", action="store_true", help="保存账号密码以自动续期")
+    p.add_argument("--remember", action="store_true", help="记住账号（不保存密码）")
     p.add_argument("--trust-device", action="store_true")
     p.set_defaults(func=cmd_login)
 

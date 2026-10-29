@@ -5,9 +5,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import android.util.Base64;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -16,6 +19,7 @@ import java.util.Locale;
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocketFactory;
 
 /** 极简 SMTP 发信：只支持文本邮件，用于校园邮箱客户端专用密码。 */
@@ -147,7 +151,50 @@ final class SmtpClient {
             s.setSSLParameters(p);
         } catch (Exception ignored) {}
         s.startHandshake();
+        verifyPeer(s, host);
         return s;
+    }
+
+    /** 校验证书链 + 主机名；mails.neu.edu.cn 使用 Coremail 云证书 *.icoremail.net。 */
+    private static void verifyPeer(SSLSocket s, String host) throws Exception {
+        SSLSession session = s.getSession();
+        Certificate[] chain = session.getPeerCertificates();
+        if (chain == null || chain.length == 0 || !(chain[0] instanceof X509Certificate)) {
+            throw new Exception("SMTP TLS 无有效证书");
+        }
+        X509Certificate cert = (X509Certificate) chain[0];
+        cert.checkValidity();
+        if (hasDnsName(cert, host)) return;
+        // 东北大学邮件由 Coremail 云托管，mails.neu.edu.cn 的证书 SAN 为 *.icoremail.net
+        if ("mails.neu.edu.cn".equalsIgnoreCase(host)
+                && (hasDnsName(cert, "*.icoremail.net") || hasDnsName(cert, "icoremail.net"))) return;
+        throw new Exception("SMTP TLS 证书主机名不匹配: " + host);
+    }
+
+    private static boolean hasDnsName(X509Certificate cert, String host) {
+        try {
+            Collection<List<?>> names = cert.getSubjectAlternativeNames();
+            if (names == null) return false;
+            for (List<?> item : names) {
+                if (item.size() < 2) continue;
+                Object type = item.get(0);
+                Object value = item.get(1);
+                if (!(type instanceof Integer) || ((Integer) type) != 2 || !(value instanceof String)) continue;
+                if (dnsMatch(host, (String) value)) return true;
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private static boolean dnsMatch(String host, String pattern) {
+        host = host.toLowerCase(Locale.US);
+        pattern = pattern.toLowerCase(Locale.US);
+        if (pattern.startsWith("*.")) {
+            String suffix = pattern.substring(1);
+            return host.endsWith(suffix) && host.length() > suffix.length()
+                    && host.substring(0, host.length() - suffix.length()).indexOf('.') < 0;
+        }
+        return host.equals(pattern);
     }
 
     private static String mime(String s) {

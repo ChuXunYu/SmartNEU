@@ -2,6 +2,16 @@
 
 本项目从 2026-10 开始整理为公开源码仓库。版本号沿用 APK 的 `0.1.x`。
 
+## v0.1.1 - 2026-10-29
+
+### 安全修复
+
+- 不再把账号密码明文写入 SharedPreferences 的 `state`；Android 改用 Keystore AES-GCM 保存，并自动迁移旧数据；
+- Desktop 端不再保存明文密码，旧的 `remember.password` 会被移除；
+- SMTP TLS 增加证书链和主机名校验；仅对 `mails.neu.edu.cn` 允许 Coremail 云证书 `*.icoremail.net`；
+- 删除硬编码的 RSA 私钥和无用的本地解密分支；
+- 移除 `webview_debug` 启动参数，release 包不能再由外部 App 开启 WebView 调试。
+
 ## v0.1.0 - 2026-10-29
 
 ### 新增
