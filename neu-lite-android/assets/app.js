@@ -1302,7 +1302,7 @@ $("#btnRunBindTab").addEventListener("click", showRunSheet);
 window.addEventListener("focus", updateRunPanel);
 $("#runPortal").addEventListener("click", () => {
   closeRunSheet();
-  openSsoSafe("https://personal.neu.edu.cn/portal", "从门户绑定校园乐跑");
+  openSsoSafe("https://personal.neu.edu.cn/portal", "自动绑定校园乐跑", true);
 });
 $("#runOpen").addEventListener("click", () => {
   const url = $("#runUrl").value.trim().replace(/\s+/g, "");
@@ -1418,10 +1418,10 @@ function openUrlSafe(url, title = "邮箱") {
   }
 }
 
-function openSsoSafe(url, title = "网页") {
+function openSsoSafe(url, title = "网页", autoBind = false) {
   if (!url) return;
   if (window.NEU && window.NEU.call) {
-    window.NEU.call("openSsoWeb", JSON.stringify({ url, title }));
+    window.NEU.call("openSsoWeb", JSON.stringify({ url, title, autoBind }));
   } else {
     openUrlSafe(url, title);
   }
