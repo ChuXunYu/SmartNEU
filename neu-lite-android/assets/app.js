@@ -1276,7 +1276,7 @@ function updateRunPanel() {
   const el = $("#runTabState");
   if (!el) return;
   const url = getCampusRunUrl();
-  el.textContent = url ? "已绑定，可直接打开；链接失效时点「从门户绑定 / 更换」。" : "尚未绑定；请从一号通门户 → 应用中心 → 校园乐跑，或粘贴完整链接。";
+  el.textContent = url ? "已绑定，可直接打开；链接失效时点「从门户绑定 / 更换」。" : "尚未绑定；登录后会自动后台绑定，也可点「更换」重试。";
 }
 
 function showRunSheet() {
@@ -1300,10 +1300,33 @@ function closeRunSheet() {
 $("#btnRunOpenTab").addEventListener("click", openCampusRun);
 $("#btnRunBindTab").addEventListener("click", showRunSheet);
 window.addEventListener("focus", updateRunPanel);
-$("#runPortal").addEventListener("click", () => {
+
+function startRunAutoBind() {
   closeRunSheet();
-  openSsoSafe("https://personal.neu.edu.cn/portal", "自动绑定校园乐跑", true);
-});
+  if (!(window.NEU && window.NEU.call)) {
+    openSsoSafe("https://personal.neu.edu.cn/portal", "自动绑定校园乐跑", true);
+    return;
+  }
+  window.NEU.call("autoBindRun", "{}");
+  $("#runTabState").textContent = "正在后台绑定校园乐跑…";
+  toast("正在后台绑定校园乐跑…");
+  clearInterval(window.__runBindTimer);
+  let tries = 0;
+  window.__runBindTimer = setInterval(() => {
+    tries++;
+    if (getCampusRunUrl()) {
+      clearInterval(window.__runBindTimer);
+      updateRunPanel();
+      toast("校园乐跑已绑定");
+    } else if (tries > 30) {
+      clearInterval(window.__runBindTimer);
+      updateRunPanel();
+      toast("自动绑定超时，可重试或粘贴链接");
+    }
+  }, 1000);
+}
+
+$("#runPortal").addEventListener("click", startRunAutoBind);
 $("#runOpen").addEventListener("click", () => {
   const url = $("#runUrl").value.trim().replace(/\s+/g, "");
   if (!/^https:\/\/tybzhtypt\.neu\.edu\.cn\//.test(url)) {

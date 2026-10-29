@@ -99,8 +99,10 @@ public class Bridge {
                 return api.sessionInfo().toString();
             case "login":
                 try {
-                    return api.login(p.optString("username"), p.optString("password"),
+                    String out = api.login(p.optString("username"), p.optString("password"),
                             p.optBoolean("remember")).toString();
+                    act.startAutoBindRun();
+                    return out;
                 } catch (Api.ApiException e) {
                     if (e.code == 3) {
                         JSONObject o = new JSONObject();
@@ -111,7 +113,9 @@ public class Bridge {
                 }
             case "quickLogin":
                 try {
-                    return api.quickLogin().toString();
+                    String out = api.quickLogin().toString();
+                    act.startAutoBindRun();
+                    return out;
                 } catch (Api.ApiException e) {
                     if (e.code == 3) {
                         JSONObject o = new JSONObject();
@@ -122,7 +126,9 @@ public class Bridge {
                 }
             case "sms":
                 if (p.optBoolean("send")) return api.sendSms().toString();
-                return api.verifySms(p.optString("code"), p.optBoolean("trust")).toString();
+                String verified = api.verifySms(p.optString("code"), p.optBoolean("trust")).toString();
+                act.startAutoBindRun();
+                return verified;
             case "logout":
                 api.logout();
                 return ok();
@@ -184,6 +190,9 @@ public class Bridge {
                 return ok();
             case "openSsoWeb":
                 act.openSsoWeb(p.optString("url"), p.optString("title", "网页"), p.optBoolean("autoBind"));
+                return ok();
+            case "autoBindRun":
+                act.startAutoBindRun();
                 return ok();
             case "schedule": {
                 String start = p.optString("start", "");

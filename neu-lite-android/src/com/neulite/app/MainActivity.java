@@ -48,6 +48,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private Api api;
     private String pendingImportPassword = "";
+    private RunBinder runBinder;
     private final List<Uri> attachments = new ArrayList<>();
     private boolean backPending = false;
 
@@ -466,6 +467,18 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 免登跳转
+    /** 登录成功后调用；全程无可见界面，成功后加密保存乐跑链接。 */
+    public void startAutoBindRun() {
+        runOnUiThread(() -> {
+            if (runBinder != null) return;
+            runBinder = new RunBinder(this, api, ok -> {
+                runBinder = null;
+                if (ok) toast("校园乐跑已自动绑定");
+            });
+            runBinder.start();
+        });
+    }
+
     public void openPay(String url, List<String[]> cookies) {
         if (url == null || url.isEmpty()) return;
         Intent i = new Intent(this, PaymentActivity.class);
@@ -544,6 +557,15 @@ public class MainActivity extends Activity {
                 toast("没有可用的浏览器");
             }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (runBinder != null) {
+            runBinder.cancel();
+            runBinder = null;
+        }
+        super.onDestroy();
     }
 
     private void toast(String msg) {
