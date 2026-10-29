@@ -219,17 +219,26 @@ public class PaymentActivity extends Activity {
         if (autoStep == 1 && url.contains("appmarketsite") && url.contains("m_home")) {
             autoStep = 2;
             autoTries = 0;
-            clickRunApp();
+            web.postDelayed(this::clickTeachingCategory, 700);
         }
+    }
+
+    private void clickTeachingCategory() {
+        if (!autoBind || runCaptured || isFinishing()) return;
+        String js = "(function(){const t='教学学习';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|tab|menu|category/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
+        web.evaluateJavascript(js, v -> {
+            if (autoBind && !runCaptured && !isFinishing()) web.postDelayed(this::clickRunApp, 900);
+        });
     }
 
     private void clickRunApp() {
         if (!autoBind || runCaptured || isFinishing()) return;
         if (autoTries++ > 12) return;
-        String js = "(function(){const t='校园乐跑';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|card|app/i.test(String(n.className)))){n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
+        String js = "(function(){const t='校园乐跑';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|card|app/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
         web.evaluateJavascript(js, v -> {
             if (!"true".equals(v) && autoBind && !runCaptured && !isFinishing()) {
-                web.postDelayed(this::clickRunApp, 900);
+                if (autoTries > 0 && autoTries % 3 == 0) clickTeachingCategory();
+                else web.postDelayed(this::clickRunApp, 900);
             }
         });
     }
