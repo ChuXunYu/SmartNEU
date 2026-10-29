@@ -255,7 +255,11 @@ public class Api {
         out.put("m", str(env, "m"));
         Object d = env.opt("d");
         if (d instanceof String && !((String) d).isEmpty()) {
-            out.put("d", d);
+            try {
+                out.put("d", new JSONObject(new String(Crypto.decrypt((String) d), StandardCharsets.UTF_8)));
+            } catch (Exception ex) {
+                out.put("d", d);
+            }
         } else if (d != null && d != JSONObject.NULL) {
             out.put("d", d);
         } else {

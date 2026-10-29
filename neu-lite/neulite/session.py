@@ -81,7 +81,11 @@ class ApiSession:
         if code != 0:
             raise ApiError(code, str(env.get("m") or ""))
         d = env.get("d")
-        # 服务端 d 目前为明文 JSON；不再保留无用的本地 RSA 解密分支。
+        if isinstance(d, str) and d:
+            try:
+                d = json.loads(crypto.decrypt(d))
+            except (ValueError, UnicodeDecodeError):
+                pass  # 少数接口 d 可能不是密文，原样返回
         return {"e": code, "m": env.get("m", ""), "d": d}
 
     def raw_get(self, url: str, **kw):

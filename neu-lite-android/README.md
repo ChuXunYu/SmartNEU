@@ -11,7 +11,7 @@ adb install -r 日在NEU.apk
 或从 [Releases](https://git.aizhangz.shop/aizhangz/SmartNEU/releases) 下载 APK 后传到手机点击安装（允许“安装未知来源应用”）。
 
 - 包名：`com.neulite.app`
-- 版本：`0.1.1`（versionCode 2）
+- 版本：`0.1.2`（versionCode 3）
 - minSdk 24 / targetSdk 34
 - 签名：自签名 `CN=neu-lite, C=CN`；升级需使用同一签名
 
@@ -48,7 +48,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File build.ps1
 本地 APK 不提交到源码仓库；发布时使用：
 
 ```powershell
-pwsh ..\scriptselease.ps1
+pwsh ..\scripts
+elease.ps1
 ```
 
 `build.ps1` 内的 SDK 路径需要按本机环境调整。
