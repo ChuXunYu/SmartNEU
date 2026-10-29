@@ -39,3 +39,16 @@ _*.sh
 final*.png
 .ws
 neu-lite/docs/_*.png
+
+# ==== 构建产物（仓库只保留一个稳定 APK） ====
+neu-lite-android/neu-lite.apk
+*.exe
+*.spec
+
+# ==== IDE / OS ====
+.venv/
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+*.log

@@ -55,7 +55,7 @@ if (-not (Test-Path $ks)) {
 }
 
 Write-Host '== sign =='
-$out = Join-Path $root 'neu-lite.apk'
+$out = Join-Path $root '日在NEU.apk'
 if (Test-Path $out) { Remove-Item $out -Force }
 & (Join-Path $bt 'apksigner.bat') sign --ks $ks --ks-key-alias neulite `
     --ks-pass pass:android --key-pass pass:android --out $out (Join-Path $build 'aligned.apk')
