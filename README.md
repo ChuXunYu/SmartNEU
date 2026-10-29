@@ -44,8 +44,8 @@ SmartNEU/
 │  ├─ src/                   # Java：Bridge、Api、SMTP、Keystore、乐跑链接
 │  ├─ res/                   # 图标、主题
 │  ├─ assets/                # Web UI
-│  ├─ build.ps1              # 无 Gradle 的 APK 构建脚本
-│  └─ 日在NEU.apk            # 当前稳定构建产物
+│  └─ build.ps1              # 无 Gradle 的 APK 构建脚本
+├─ scripts/release.ps1       # 构建并发布 APK 到 Release
 ├─ icon.jpg                  # 应用图标源图
 ├─ LICENSE                   # MIT
 ├─ CONTRIBUTING.md           # 贡献指南
@@ -67,13 +67,21 @@ cd neu-lite-android
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-产物：
+本地构建产物：
 
 ```text
 neu-lite-android/日在NEU.apk
 ```
 
+APK 不上传源码仓库，统一发布到 Release：
+
+<https://git.aizhangz.shop/aizhangz/SmartNEU/releases>
+
 `build.ps1` 内的 Android SDK 路径需要按本机环境修改。
+
+## 下载
+
+最新版 APK 请从 [Releases](https://git.aizhangz.shop/aizhangz/SmartNEU/releases) 下载。
 
 ## 本地 Web / 桌面端
 

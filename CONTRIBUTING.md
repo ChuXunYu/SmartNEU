@@ -24,6 +24,30 @@
 5. 不要在提交中包含 APK、exe、`state.json`、keystore、token 或个人截图；
 6. PR 描述写清楚动机、改动和验证方式。
 
+## 发布
+
+发布前：
+
+1. 更新 `neu-lite-android/AndroidManifest.xml` 的 `versionName` / `versionCode`；
+2. 在 `CHANGELOG.md` 增加同版本小节；
+3. 提交后工作区必须干净。
+
+然后执行：
+
+```powershell
+pwsh .\scriptselease.ps1
+```
+
+脚本会：
+
+- 构建 APK；
+- 创建 `v<version>` 标签；
+- 推送 `main` 和标签；
+- 在 Forgejo 创建 Release；
+- 上传 `日在NEU-v<version>.apk` 和 SHA-256。
+
+APK 不提交到源码仓库，只作为 Release 资产分发。
+
 ## 代码风格
 
 - Java：4 空格缩进，保持现有命名；

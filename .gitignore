@@ -52,3 +52,6 @@ neu-lite-android/neu-lite.apk
 Thumbs.db
 .DS_Store
 *.log
+
+# APK 只发布到 Release，不进入源码仓库
+*.apk
