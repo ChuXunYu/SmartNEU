@@ -135,6 +135,8 @@ public class PaymentActivity extends Activity {
             @Override
             public void onReceivedTitle(WebView view, String title) {
                 super.onReceivedTitle(view, title);
+                // H5 常用 hash 路由，onPageStarted 不一定会再次触发；标题变化时补一次捕获。
+                captureRunUrl(view.getUrl());
                 android.util.Log.d("NeuPay", "title=" + title + " url=" + view.getUrl());
             }
 

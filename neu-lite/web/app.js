@@ -1276,7 +1276,7 @@ function updateRunPanel() {
   const el = $("#runTabState");
   if (!el) return;
   const url = getCampusRunUrl();
-  el.textContent = url ? "已绑定，可直接打开；链接失效时点「从门户绑定 / 更换」。" : "尚未绑定；请从门户进入一次，或粘贴完整链接。";
+  el.textContent = url ? "已绑定，可直接打开；链接失效时点「从门户绑定 / 更换」。" : "尚未绑定；请从一号通门户 → 应用中心 → 校园乐跑，或粘贴完整链接。";
 }
 
 function showRunSheet() {
@@ -1302,7 +1302,7 @@ $("#btnRunBindTab").addEventListener("click", showRunSheet);
 window.addEventListener("focus", updateRunPanel);
 $("#runPortal").addEventListener("click", () => {
   closeRunSheet();
-  openSsoSafe("https://personal.neu.edu.cn/", "从门户绑定校园乐跑");
+  openSsoSafe("https://personal.neu.edu.cn/portal", "从门户绑定校园乐跑");
 });
 $("#runOpen").addEventListener("click", () => {
   const url = $("#runUrl").value.trim().replace(/\s+/g, "");
