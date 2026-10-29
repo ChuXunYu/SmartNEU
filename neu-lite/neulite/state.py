@@ -45,9 +45,12 @@ def load(path: str = config.STATE_FILE) -> State:
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     st = State(**{k: v for k, v in raw.items() if k in State.__dataclass_fields__})
+    had_password = bool(st.remember and st.remember.get("password"))
     if st.remember:
         st.remember.pop("password", None)
     st.ensure_imei()
+    if had_password:
+        save(st, path)  # 立即把旧的明文密码从磁盘清除
     return st
 
 
