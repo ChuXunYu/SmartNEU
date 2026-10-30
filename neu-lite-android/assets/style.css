@@ -1139,3 +1139,7 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 .tg-course b{width:100%;text-align:center;color:var(--ink)}
 .tg-course small{width:100%;text-align:center;color:rgba(23,20,17,.72)}
 .tg-stack .tg-course{background:var(--c,var(--cream))}
+
+
+#timeline{will-change:transform;touch-action:pan-y}
+#timeline .timetable{touch-action:pan-y}

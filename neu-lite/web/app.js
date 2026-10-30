@@ -908,34 +908,76 @@ $("#prevWeek").addEventListener("click", () => loadWeek(-1));
 $("#nextWeek").addEventListener("click", () => loadWeek(1));
 $("#btnThisWeek").addEventListener("click", goThisWeek);
 
-/* 周课表左右滑动切换上一周 / 下一周 */
+/* 周课表跟手横向滑动，松手吸附到上一周 / 下一周 */
 (() => {
   const panel = $("#panel-schedule");
-  if (!panel) return;
-  let start = null;
+  const timeline = $("#timeline");
+  if (!panel || !timeline) return;
+  let drag = null;
   let lastTouch = 0;
   let blockClickUntil = 0;
+  let snapTimer = 0;
+
   const allowed = (target) => !(target && target.closest &&
     target.closest("button,a,input,textarea,select,.sheet,.tabbar"));
 
-  const begin = (x, y) => {
-    if (state.view !== "week") return;
-    start = { x, y, at: Date.now() };
+  const setX = (x) => {
+    timeline.style.transform = `translate3d(${x}px,0,0)`;
   };
-  const end = (x, y) => {
-    if (!start) return;
-    const s = start;
-    start = null;
-    const dx = x - s.x;
-    const dy = y - s.y;
-    if (Date.now() - s.at > 900) return;
-    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-    if (s.x < 24 || x < 24) return; // 避开系统边缘返回手势
-    if (weekBusy) return;
-    blockClickUntil = Date.now() + 420;
-    $("#timeline").classList.add(dx < 0 ? "swipe-left" : "swipe-right");
-    setTimeout(() => $("#timeline").classList.remove("swipe-left", "swipe-right"), 260);
-    loadWeek(dx < 0 ? 1 : -1);
+
+  const springBack = () => {
+    timeline.style.transition = "transform .22s cubic-bezier(.22,.61,.36,1)";
+    setX(0);
+    setTimeout(() => { timeline.style.transition = ""; }, 240);
+  };
+
+  const begin = (x, y) => {
+    if (state.view !== "week" || weekBusy) return;
+    clearTimeout(snapTimer);
+    drag = { x, y, horiz: false };
+    timeline.style.transition = "none";
+  };
+
+  const move = (x, y, ev) => {
+    if (!drag) return;
+    const dx = x - drag.x;
+    const dy = y - drag.y;
+    if (!drag.horiz) {
+      if (Math.abs(dx) < 8) return;
+      if (Math.abs(dx) <= Math.abs(dy) * 1.2) { drag = null; return; }
+      drag.horiz = true;
+    }
+    if (ev && ev.cancelable) ev.preventDefault();
+    setX(dx);
+  };
+
+  const finish = (x) => {
+    if (!drag) return;
+    const d = drag;
+    const dx = x - d.x;
+    const horiz = d.horiz;
+    drag = null;
+    if (!horiz) return;
+    blockClickUntil = Date.now() + 520;
+    const width = timeline.clientWidth || panel.clientWidth || 360;
+    if (Math.abs(dx) < Math.max(56, width * 0.22)) {
+      springBack();
+      return;
+    }
+    const dir = dx < 0 ? 1 : -1; // 左滑下一周，右滑上一周
+    const out = dir > 0 ? -width : width;
+    timeline.style.transition = "transform .22s cubic-bezier(.22,.61,.36,1)";
+    setX(out);
+    snapTimer = setTimeout(() => {
+      loadWeek(dir);
+      timeline.style.transition = "none";
+      setX(-out);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        timeline.style.transition = "transform .24s cubic-bezier(.22,.61,.36,1)";
+        setX(0);
+        setTimeout(() => { timeline.style.transition = ""; }, 260);
+      }));
+    }, 205);
   };
 
   panel.addEventListener("touchstart", (e) => {
@@ -944,23 +986,36 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     if (!allowed(e.target)) return;
     begin(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: true });
+
+  panel.addEventListener("touchmove", (e) => {
+    if (!drag || e.touches.length !== 1) return;
+    move(e.touches[0].clientX, e.touches[0].clientY, e);
+  }, { passive: false });
+
   panel.addEventListener("touchend", (e) => {
     const t = e.changedTouches[0];
     if (!t) return;
     lastTouch = Date.now();
-    end(t.clientX, t.clientY);
+    finish(t.clientX);
   }, { passive: true });
+
+  panel.addEventListener("touchcancel", () => {
+    if (drag) { drag = null; springBack(); }
+  });
 
   panel.addEventListener("mousedown", (e) => {
     if (Date.now() - lastTouch < 800 || e.button !== 0 || !allowed(e.target)) return;
     begin(e.clientX, e.clientY);
   });
+  window.addEventListener("mousemove", (e) => {
+    if (Date.now() - lastTouch < 800) return;
+    move(e.clientX, e.clientY, e);
+  });
   window.addEventListener("mouseup", (e) => {
     if (Date.now() - lastTouch < 800) return;
-    end(e.clientX, e.clientY);
+    finish(e.clientX);
   });
 
-  // 滑动后浏览器可能补发一次 click，阻止它误触课程/日期。
   panel.addEventListener("click", (e) => {
     if (Date.now() < blockClickUntil) {
       e.preventDefault();
