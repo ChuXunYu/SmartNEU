@@ -647,6 +647,18 @@ function renderWeek(days) {
       slotTimes[b.end - 1] = t2;
     }
   });
+  // 考试也参与节次时间，避免有考试的行时间空白。
+  allExams.forEach((e) => {
+    const b = sectionBounds(e);
+    const t1 = e.hm || (e.start || "").slice(11, 16);
+    const t2 = e.endHm || (e.end || "").slice(11, 16);
+    if (t1 && b.start >= 1 && b.start <= slotTimes.length && !slotTimes[b.start - 1]) {
+      slotTimes[b.start - 1] = t1;
+    }
+    if (t2 && b.end >= 1 && b.end <= slotTimes.length && !slotTimes[b.end - 1]) {
+      slotTimes[b.end - 1] = t2;
+    }
+  });
 
   const head = weekDays.map((d, i) => {
     const exams = examsForDate(d.date);
