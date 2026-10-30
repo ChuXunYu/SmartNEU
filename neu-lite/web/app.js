@@ -605,11 +605,14 @@ function renderWeek(days) {
   const weekDays = WEEK_ORDER.map((i) => days[i]);
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
   const slotTimes = PERIOD_START.slice();
+  const slotSeen = new Set();
   events.forEach((e) => {
     const b = sectionBounds(e);
     const tm = (e.start || "").slice(11, 16);
-    if (tm && b.start >= 1 && b.start <= slotTimes.length && (!slotTimes[b.start - 1] || tm < slotTimes[b.start - 1])) {
+    if (!tm || b.start < 1 || b.start > slotTimes.length) return;
+    if (!slotSeen.has(b.start) || tm < slotTimes[b.start - 1]) {
       slotTimes[b.start - 1] = tm;
+      slotSeen.add(b.start);
     }
   });
 
