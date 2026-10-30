@@ -395,7 +395,7 @@ function examStatSummary() {
   const ws = ymd(sunday);
   const we = ymd(new Date(sunday.getTime() + 6 * 86400000));
   const week = items.filter((e) => e.date >= ws && e.date <= we).length;
-  const up = items.filter((e) => e.date >= today).sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  const up = items.filter((e) => !isExamPast(e)).sort((a, b) => (a.start || "").localeCompare(b.start || ""));
   if (!up.length) return { week, value: "—", label: "暂无考试" };
   const days = Math.round((new Date(up[0].date + "T00:00:00") - new Date(today + "T00:00:00")) / 86400000);
   if (days <= 0) return { week, value: "今天", label: "有考试" };
@@ -483,7 +483,7 @@ function renderExamUpNext() {
   const we = ws ? ymd(new Date(state.weekStart.getTime() + 6 * 86400000)) : "";
   const today = ymd(new Date());
   const list = examItems()
-    .filter((e) => e.date >= today && (e.date < ws || e.date > we))
+    .filter((e) => !isExamPast(e) && (e.date < ws || e.date > we))
     .sort((a, b) => (a.start || "").localeCompare(b.start || ""))
     .slice(0, 3);
   if (!list.length) {
@@ -1096,12 +1096,13 @@ function hmMinutes(s) {
 
 function isExamPast(x) {
   const p = examParts(x);
-  if (!p.date) return false;
+  const date = x.date || p.date;
+  if (!date) return false;
   const now = new Date();
   const today = ymd(now);
-  if (p.date < today) return true;
-  if (p.date > today) return false;
-  const end = hmMinutes(p.end);
+  if (date < today) return true;
+  if (date > today) return false;
+  const end = x.endHm != null ? hmMinutes(x.endHm) : hmMinutes(p.end);
   if (end == null) return false;
   return now.getHours() * 60 + now.getMinutes() > end;
 }
