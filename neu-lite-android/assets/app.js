@@ -639,15 +639,22 @@ function renderWeek(days) {
       <div class="tg-cell ${d.date === today ? "today" : ""}" style="grid-column:${i + 2};grid-row:${r + 2}"></div>`
     ).join("")).join("");
 
-  const cards = [];
+  const buckets = new Map();
+  const add = (d, b, html) => {
+    const key = `${d.date}|${b.start}|${b.end}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, { col: colOf.get(d.date), start: b.start, end: b.end, cards: [] });
+    }
+    buckets.get(key).cards.push(html);
+  };
+
   weekDays.forEach((d) => {
-    const col = colOf.get(d.date);
     events.filter((e) => (e.start || "").slice(0, 10) === d.date).forEach((e) => {
       const b = sectionBounds(e);
       const t1 = (e.start || "").slice(11, 16);
       const t2 = (e.end || "").slice(11, 16);
       const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
-      cards.push(`<div class="tg-course" style="grid-column:${col};grid-row:${b.start + 1}/${b.end + 2};--c:${courseColor(e)}"
+      add(d, b, `<div class="tg-course" style="--c:${courseColor(e)}"
         data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
         <i class="tg-time">${esc(t1)}</i>
         <b>${esc(e.title || "未命名课程")}</b>
@@ -657,13 +664,18 @@ function renderWeek(days) {
     examsForDate(d.date).forEach((e) => {
       const b = sectionBounds(e);
       const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).join(" · ");
-      cards.push(`<div class="tg-exam" style="grid-column:${col};grid-row:${b.start + 1}/${b.end + 2}"
-        data-date="${d.date}" title="${esc(e.title || "考试")}">
+      add(d, b, `<div class="tg-exam" data-date="${d.date}" title="${esc(e.title || "考试")}">
         <i class="tg-time">${esc(e.hm || "")}</i>
         <b>考试 · ${esc(e.title || "考试")}</b>
         <small>${esc(meta)}</small>
       </div>`);
     });
+  });
+
+  const cards = [...buckets.values()].map((g) => {
+    const style = `grid-column:${g.col};grid-row:${g.start + 1}/${g.end + 2}`;
+    if (g.cards.length === 1) return `<div class="tg-one" style="${style}">${g.cards[0]}</div>`;
+    return `<div class="tg-stack" style="${style}" title="${g.cards.length} 门课程重叠">${g.cards.join("")}</div>`;
   });
 
   $("#timeline").innerHTML = `<div class="timetable">

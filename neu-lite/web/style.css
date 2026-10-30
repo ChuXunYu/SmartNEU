@@ -1066,3 +1066,11 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
   .tg-course b,.tg-exam b{font-size:10px}
   .tg-course small,.tg-exam small{font-size:8px}
 }
+
+
+/* 同一格多门课：纵向堆叠，全部可见 */
+.tg-one,.tg-stack{z-index:2;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;margin:2px 1px;gap:1px}
+.tg-one .tg-course,.tg-one .tg-exam,.tg-stack .tg-course,.tg-stack .tg-exam{flex:1;min-height:0;margin:0;box-shadow:none}
+.tg-stack .tg-course b,.tg-stack .tg-exam b{font-size:8px;line-height:1.1}
+.tg-stack .tg-course small,.tg-stack .tg-exam small{font-size:6.5px}
+.tg-stack .tg-course .tg-time,.tg-stack .tg-exam .tg-time{font-size:6px}
