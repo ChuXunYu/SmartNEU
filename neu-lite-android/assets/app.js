@@ -604,6 +604,19 @@ function courseColor(e) {
   return palette[n % palette.length];
 }
 
+function fitTimetable(rows) {
+  const grid = $("#timeline .timetable");
+  const tab = $(".tabbar");
+  if (!grid || !tab || !rows) return;
+  const top = grid.getBoundingClientRect().top;
+  const bottom = tab.getBoundingClientRect().top;
+  const available = bottom - top - 6;
+  if (available < 120) return;
+  const header = 42;
+  const height = Math.max(28, Math.min(46, Math.floor((available - header) / rows)));
+  grid.style.gridTemplateRows = `${header}px repeat(${rows}, ${height}px)`;
+}
+
 function renderWeek(days) {
   const events = state.schedule?.events || [];
   const today = ymd(new Date());
@@ -707,6 +720,8 @@ function renderWeek(days) {
     <div class="tg-corner" style="grid-column:1;grid-row:1"><b>节</b><span>时间</span></div>
     ${head}${slots}${cells}${cards.join("")}
   </div>`;
+
+  requestAnimationFrame(() => fitTimetable(periodCount));
 
   $$("#timeline .tg-day, #timeline .tg-course, #timeline .tg-exam").forEach((el) => {
     el.addEventListener("click", () => {
