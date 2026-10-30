@@ -1150,3 +1150,6 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 .week-track{display:flex;width:200%;will-change:transform}
 .week-page{width:50%;flex:0 0 50%;min-width:0}
 .week-page .timetable{width:100%}
+
+#timeline.week-swiping .tg-course{box-shadow:none}
+.week-page{contain:layout paint;overflow:hidden}

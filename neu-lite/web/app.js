@@ -946,7 +946,7 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
   const begin = (x, y) => {
     if (state.view !== "week" || weekBusy) return;
     clearTimeout(snapTimer);
-    drag = { x, y, horiz: false, track: null };
+    drag = { x, y, horiz: false, track: null, width: 0 };
   };
 
   const buildTrack = (dir) => {
@@ -955,19 +955,27 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     const adjacent = computeWeek(anchor);
     if (!adjacent) return false;
     const days = daysFromSchedule(adjacent);
-    const currentHtml = timeline.innerHTML;
+    const currentGrid = timeline.firstElementChild;
+    if (!currentGrid) return false;
     const adjacentHtml = weekHtmlFor(days, adjacent).html;
-    const pages = dir > 0 ? [currentHtml, adjacentHtml] : [adjacentHtml, currentHtml];
+    const currentPage = document.createElement("div");
+    currentPage.className = "week-page";
+    currentPage.appendChild(currentGrid); // 保留当前节点，避免触摸目标被销毁
+    const adjacentPage = document.createElement("div");
+    adjacentPage.className = "week-page";
+    adjacentPage.innerHTML = adjacentHtml;
     const track = document.createElement("div");
     track.className = "week-track";
-    track.innerHTML = pages.map((html) => `<div class="week-page">${html}</div>`).join("");
-    timeline.innerHTML = "";
-    timeline.appendChild(track);
+    if (dir > 0) track.append(currentPage, adjacentPage);
+    else track.append(adjacentPage, currentPage);
+    timeline.replaceChildren(track);
+    timeline.classList.add("week-swiping");
     drag.track = track;
     drag.adj = adjacent;
     drag.dir = dir;
-    drag.currentHtml = currentHtml;
-    drag.base = dir > 0 ? 0 : -viewWidth();
+    drag.currentGrid = currentGrid;
+    drag.width = viewWidth();
+    drag.base = dir > 0 ? 0 : -drag.width;
     track.style.transform = `translate3d(${drag.base}px,0,0)`;
     requestAnimationFrame(() => fitTimetable(12));
     return true;
@@ -984,15 +992,15 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
       drag.horiz = true;
     }
     if (ev && ev.cancelable) ev.preventDefault();
-    const max = viewWidth();
+    const max = drag.width || viewWidth();
     const offset = Math.max(-max, Math.min(max, dx));
     drag.track.style.transform = `translate3d(${drag.base + offset}px,0,0)`;
   };
 
-  const restoreCurrent = (html) => {
-    timeline.innerHTML = html;
+  const restoreCurrent = (grid) => {
+    if (grid) timeline.replaceChildren(grid);
+    timeline.classList.remove("week-swiping");
     timeline.style.transform = "";
-    bindWeekCards(timeline, daysFromSchedule(state.schedule));
     requestAnimationFrame(() => fitTimetable(12));
   };
 
@@ -1004,7 +1012,7 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     drag = null;
     if (!horiz || !d.track) return;
     blockClickUntil = Date.now() + 520;
-    const width = viewWidth();
+    const width = d.width || viewWidth();
     const threshold = Math.max(56, width * 0.22);
     const go = d.dir > 0 ? dx < -threshold : dx > threshold;
     const target = go ? (d.dir > 0 ? -width : 0) : d.base;
@@ -1012,12 +1020,13 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     d.track.style.transform = `translate3d(${target}px,0,0)`;
     snapTimer = setTimeout(() => {
       if (go) {
+        timeline.classList.remove("week-swiping");
         state.schedule = d.adj;
         state.weekStart = new Date(d.adj.start + "T00:00:00");
         state.selectedDay = null;
         renderSchedule(d.adj);
       } else {
-        restoreCurrent(d.currentHtml);
+        restoreCurrent(d.currentGrid);
       }
       timeline.style.transition = "";
     }, 220);
@@ -1047,7 +1056,7 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     const d = drag;
     drag = null;
     if (d.track) d.track.style.transform = `translate3d(${d.base}px,0,0)`;
-    setTimeout(() => restoreCurrent(d.currentHtml), 220);
+    setTimeout(() => restoreCurrent(d.currentGrid), 220);
   });
 
   panel.addEventListener("mousedown", (e) => {
