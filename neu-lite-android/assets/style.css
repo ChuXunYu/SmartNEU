@@ -1103,12 +1103,19 @@ body.card-mode .masthead{padding:10px 18px 8px}
 body.roomy-top main{padding-left:10px;padding-right:10px}
 #panel-schedule,#panel-exams{width:100%;max-width:760px;margin:0 auto}
 #panel-schedule .timetable{width:100%;margin-left:auto;margin-right:auto}
+#panel-exams .exam-center{width:100%;max-width:620px;margin:auto;display:flex;flex-direction:column}
 #panel-exams .examlist{width:100%;max-width:620px;margin:0 auto}
 #panel-exams{min-height:calc(100dvh - 150px);display:flex;flex-direction:column}
-#panel-exams .examlist{margin-top:auto;margin-bottom:auto}
 
 
 #timeline.swipe-left{animation:swipeLeft .24s ease both}
 #timeline.swipe-right{animation:swipeRight .24s ease both}
 @keyframes swipeLeft{from{opacity:.55;transform:translateX(10px)}to{opacity:1;transform:none}}
 @keyframes swipeRight{from{opacity:.55;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+
+/* 考试页去掉重复操作后，标题和内容居中 */
+#panel-exams .section-head{justify-content:center;text-align:center}
+#panel-exams .section-head h3{width:100%;justify-content:center}
+#panel-exams #examNote{text-align:center;margin-left:auto;margin-right:auto;max-width:560px}
+#panel-exams .examgroup-head{justify-content:center;gap:10px}

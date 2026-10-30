@@ -1070,15 +1070,6 @@ function renderExams(exams) {
   box.innerHTML = html;
 }
 
-async function probeJwxt() {
-  toast("正在检查教务…");
-  try {
-    const j = await api("/api/jwxt?probe=1");
-    toast(j.status === "ok" ? `教务已连接：考试 ${j.exams ?? 0} · 成绩 ${j.grades ?? 0}` : (j.note || "教务未连接"));
-    await refresh();
-  } catch (e) { toast(e.message); }
-}
-
 /* ---------------- 成绩 ---------------- */
 const GRADE_BANDS = [
   { key: "b90", label: "90+", test: (n) => n >= 90 },
@@ -1589,7 +1580,6 @@ function exportPlainCsvAll() {
 }
 
 $("#btnExportKb").addEventListener("click", () => encryptedExport("timetable"));
-$("#btnExportExams").addEventListener("click", () => encryptedExport("exams"));
 $("#btnExport").addEventListener("click", () => { closeSheet(); encryptedExport("state"); });
 $("#btnImport").addEventListener("click", async () => {
   closeSheet();
@@ -1610,16 +1600,6 @@ if (window.NEU) {
   });
 }
 $("#btnRefresh").addEventListener("click", () => { closeSheet(); refresh(); });
-$("#probeJwxt").addEventListener("click", probeJwxt);
-
-function exportCsv(kind) {
-  if (window.NEU) {
-    const r = String(window.NEU.exportCsv(kind) || "");
-    toast(r.startsWith("ERR") ? r : "已导出：" + r);
-    return;
-  }
-  location.href = kind === "exams" ? "/api/export/exams.csv" : "/api/export/timetable.csv";
-}
 
 /* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
 function openUrlSafe(url, title = "邮箱") {
