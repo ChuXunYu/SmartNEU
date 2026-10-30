@@ -586,7 +586,11 @@ function sectionBounds(e) {
     const b = Math.max(a, Math.min(PERIOD_COUNT, Number(m[2])));
     return { start: a, end: b };
   }
-  return sectionFromClock((e.start || "").slice(11, 16) || e.hm) || { start: 1, end: 2 };
+  const startHm = (e.start || "").slice(11, 16) || e.hm;
+  const endHm = (e.end || "").slice(11, 16) || e.endHm;
+  const b = sectionFromClock(startHm) || { start: 1, end: 2 };
+  const en = sectionFromClock(endHm);
+  return { start: b.start, end: Math.max(b.start, en ? en.end : b.end) };
 }
 
 function courseColor(e) {
