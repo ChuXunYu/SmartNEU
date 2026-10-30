@@ -606,18 +606,20 @@ function renderWeek(days) {
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
   // 有真实课程时，行时间完全按接口返回的上课/下课时间；没有课程时才用默认节次时间占位。
   const slotTimes = events.length ? Array(PERIOD_COUNT).fill("") : PERIOD_START.slice();
-  const slotSeen = new Set();
+  // 先放上课时间；同一节有多门课时取最早的上课时间。
   events.forEach((e) => {
     const b = sectionBounds(e);
     const t1 = (e.start || "").slice(11, 16);
-    const t2 = (e.end || "").slice(11, 16);
-    if (t1 && b.start >= 1 && b.start <= slotTimes.length && !slotSeen.has(b.start)) {
+    if (t1 && b.start >= 1 && b.start <= slotTimes.length && (!slotTimes[b.start - 1] || t1 < slotTimes[b.start - 1])) {
       slotTimes[b.start - 1] = t1;
-      slotSeen.add(b.start);
     }
-    if (t2 && b.end >= 1 && b.end <= slotTimes.length && !slotSeen.has(b.end)) {
+  });
+  // 只有该节没有上课时间的课程时，才用下课时间补空行。
+  events.forEach((e) => {
+    const b = sectionBounds(e);
+    const t2 = (e.end || "").slice(11, 16);
+    if (t2 && b.end >= 1 && b.end <= slotTimes.length && !slotTimes[b.end - 1]) {
       slotTimes[b.end - 1] = t2;
-      slotSeen.add(b.end);
     }
   });
 
