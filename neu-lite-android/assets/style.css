@@ -1143,3 +1143,10 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 
 #timeline{will-change:transform;touch-action:pan-y}
 #timeline .timetable{touch-action:pan-y}
+
+
+/* 相邻两周并排滑动 */
+#timeline{overflow:hidden}
+.week-track{display:flex;width:200%;will-change:transform}
+.week-page{width:50%;flex:0 0 50%;min-width:0}
+.week-page .timetable{width:100%}
