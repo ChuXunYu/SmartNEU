@@ -40,7 +40,12 @@ async function httpApi(path, opts = {}) {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
   const j = await r.json().catch(() => ({}));
   if (!r.ok && !j.error) throw new Error(`HTTP ${r.status}`);
-  if (j.error) throw new Error(j.error);
+  if (j.error) {
+    const err = new Error(j.error);
+    const m = /e=(\d+)/.exec(j.error);
+    if (m) err.code = Number(m[1]);
+    throw err;
+  }
   return j;
 }
 function nativeCall(action, payload) {
@@ -92,6 +97,7 @@ async function nativeApi(path, opts = {}) {
   const body = opts.body ? JSON.parse(opts.body) : {};
   switch (p) {
     case "/api/session": return nativeCall("session");
+    case "/api/check": return nativeCallAsync("check");
     case "/api/overview": return nativeCallAsync("overview", { probe: params.get("probe") === "1" });
     case "/api/schedule": return nativeCallAsync("schedule", { start: params.get("start") || "" });
     case "/api/net": return nativeCallAsync("net");
@@ -292,6 +298,11 @@ async function refresh() {
     }, 1200);
   } catch (e) {
     if (myId !== refreshId) return;
+    if (e && e.code === 10013) {
+      finishRefresh(false);
+      showSessionExpired();
+      return;
+    }
     toast("更新失败：" + e.message);
     finishRefresh(false);
   } finally {
@@ -318,6 +329,18 @@ async function loadIpwg() {
 }
 
 let silentLoading = false;
+let sessionExpiredShown = false;
+
+function showSessionExpired() {
+  if (sessionExpiredShown) return;
+  sessionExpiredShown = true;
+  const prev = state.session || {};
+  state.session = Object.assign({}, prev, { logged_in: false });
+  $("#appView").classList.add("hidden");
+  $("#loginView").classList.remove("hidden");
+  try { renderLoginMode(state.session); } catch {}
+  toast("登录已失效，请重新登录");
+}
 
 async function boot() {
   try {
@@ -326,6 +349,7 @@ async function boot() {
     toast("无法连接后端");
     return;
   }
+  sessionExpiredShown = false;
   const logged = !!state.session.logged_in;
   $("#loginView").classList.toggle("hidden", logged);
   $("#appView").classList.toggle("hidden", !logged);
@@ -344,6 +368,7 @@ async function boot() {
     setUpdated(cache.at);
     setTimeout(warmCard, 500);
     setTimeout(restoreComposeDraft, 900);
+    setTimeout(validateSessionInBackground, 600);
     return;
   }
   // 首次安装：先用本地资料占位，再拉一次
@@ -358,6 +383,18 @@ async function boot() {
   await refresh();
   setTimeout(warmCard, 300);
   setTimeout(restoreComposeDraft, 900);
+  setTimeout(validateSessionInBackground, 600);
+}
+
+async function validateSessionInBackground() {
+  if (!state.session || !state.session.logged_in || state.session.demo) return;
+  try {
+    const chk = await withTimeout(api("/api/check", { method: "POST" }), 8000, "会话校验超时");
+    if (chk && (chk.status === "expired" || chk.e === 10013)) showSessionExpired();
+  } catch (e) {
+    if (e && e.code === 10013) showSessionExpired();
+    // 网络失败/超时不要误判为登录失效，保留缓存继续用。
+  }
 }
 
 function greeting() {
@@ -2371,6 +2408,11 @@ async function confirmPay() {
     pollPay(r.order_no);
   } catch (e) {
     if (payWin) { try { payWin.close(); } catch {} }
+    if (e && e.code === 10013) {
+      closePaySheet();
+      showSessionExpired();
+      return;
+    }
     $("#payMsg").textContent = e.message;
   } finally {
     btn.disabled = false;

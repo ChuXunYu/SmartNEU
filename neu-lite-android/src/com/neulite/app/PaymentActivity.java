@@ -98,6 +98,9 @@ public class PaymentActivity extends Activity {
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
+        // 支付/门户 WebView 不能继承上一次会话的旧 Cookie。
+        cm.removeAllCookies(null);
+        cm.flush();
         if (cookies != null) {
             for (String row : cookies) {
                 String[] p = row.split("\t", -1);

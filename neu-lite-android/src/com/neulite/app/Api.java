@@ -103,6 +103,13 @@ public class Api {
     private JSONArray linksCache;
     private long linksAt = 0;
 
+    /** 登录/重登/登出共用一把锁，保证同一时刻只发生一次会话切换。 */
+    private final Object authLock = new Object();
+    private volatile long authGeneration = 1;
+    private boolean reloginRunning = false;
+    private String lastAuthError = "";
+    private long payAuthGeneration = -1;
+
     public Api(Context ctx) {
         this.ctx = ctx;
         sp = ctx.getSharedPreferences("neu", Context.MODE_PRIVATE);
@@ -144,9 +151,11 @@ public class Api {
     }
 
     public void save() {
-        try { st.put("updated_at", nowStr()); } catch (Exception ignored) {}
-        snapshotCookies();
-        sp.edit().putString("state", st.toString()).apply();
+        synchronized (authLock) {
+            try { st.put("updated_at", nowStr()); } catch (Exception ignored) {}
+            snapshotCookies();
+            sp.edit().putString("state", st.toString()).apply();
+        }
     }
 
     static void put(JSONObject o, String k, Object v) {
@@ -158,15 +167,9 @@ public class Api {
 
     private void syncCookies(boolean clear) {
         if (clear) cookies.getCookieStore().removeAll();
-        String t = ticket();
-        if (!t.isEmpty()) {
-            addCookie("CASTGC", t, ".neu.edu.cn", "/");
-            addCookie("CASTGC", t, "pass.neu.edu.cn", "/tpass/");
-        }
-        String lc = str(st, "ck_lc");
-        String vl = str(st, "ck_vl");
-        if (!lc.isEmpty()) addCookie("CK_LC", lc, "personal.neu.edu.cn", "/");
-        if (!vl.isEmpty()) addCookie("CK_VL", vl, "personal.neu.edu.cn", "/");
+
+        // 先恢复普通 Cookie，最后写入权威的 CASTGC/CK_LC/CK_VL。
+        // CookieStore 对同名同域 Cookie 是替换语义；旧值绝不能最后写入，否则会覆盖新登录态。
         JSONArray arr = st.optJSONArray("cookies");
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -176,6 +179,43 @@ public class Api {
                         c.optString("domain"), c.optString("path", "/"));
             }
         }
+
+        String t = ticket();
+        if (!t.isEmpty()) {
+            addCookie("CASTGC", t, ".neu.edu.cn", "/");
+            addCookie("CASTGC", t, "pass.neu.edu.cn", "/tpass/");
+        }
+        String lc = str(st, "ck_lc");
+        String vl = str(st, "ck_vl");
+        if (!lc.isEmpty()) addCookie("CK_LC", lc, "personal.neu.edu.cn", "/");
+        if (!vl.isEmpty()) addCookie("CK_VL", vl, "personal.neu.edu.cn", "/");
+    }
+
+    /** 清空 Cookie 和持久化 Cookie，不碰 remember 账号。 */
+    private void clearAuthCookies() {
+        cookies.getCookieStore().removeAll();
+        put(st, "cookies", new JSONArray());
+    }
+
+    /** 登录态变化后，所有依赖旧会话的服务标志和缓存必须一起失效。 */
+    private void resetServiceSessions() {
+        jwxtOk = false;
+        webvpn = false;
+        webvpnAuthed = false;
+        webvpnBase = "";
+        ecodeAuthed = false;
+        ecodeViaVpn = false;
+        ecodeBase = ECODE;
+        mailBase = "";
+        payAuthed = false;
+        payAuthGeneration = -1;
+        ttCache = null;
+        termCache = null;
+        ttAt = 0;
+        termAt = 0;
+        ttTerm = "";
+        linksCache = null;
+        linksAt = 0;
     }
 
     private void addCookie(String name, String value, String domain, String path) {
@@ -280,11 +320,11 @@ public class Api {
     }
 
     JSONObject call(String url, JSONObject payload) throws Exception {
-        String ticket = ticket();
+        long generation = authGeneration;
         try {
-            return envelope(url, payload, ticket);
+            return envelope(url, payload, ticket());
         } catch (SessionExpired e) {
-            if (relogin()) {
+            if (relogin(generation)) {
                 return envelope(url, payload, ticket());
             }
             throw e;
@@ -301,21 +341,73 @@ public class Api {
     }
 
     boolean relogin() {
-        JSONObject rem = st.optJSONObject("remember");
-        if (rem == null) return false;
-        String u = str(rem, "username");
-        String p = SecretStore.getLoginPassword(ctx);
-        if (u.isEmpty() || p.isEmpty()) return false;
-        try {
-            login(u, p, true);
-            return true;
-        } catch (Exception e) {
-            return false;
+        return relogin(authGeneration);
+    }
+
+    /**
+     * 单飞重登：只允许一个线程真正登录；其他并发请求等待同一代会话完成。
+     * observedGeneration 是发起请求时看到的代次；若期间其他线程已换新会话，直接重试。
+     */
+    boolean relogin(long observedGeneration) {
+        synchronized (authLock) {
+            if (authGeneration != observedGeneration) return true;
+            if (reloginRunning) {
+                long deadline = System.currentTimeMillis() + 20000;
+                while (reloginRunning && authGeneration == observedGeneration
+                        && System.currentTimeMillis() < deadline) {
+                    try {
+                        authLock.wait(1000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                }
+                return authGeneration != observedGeneration;
+            }
+
+            JSONObject rem = st.optJSONObject("remember");
+            String u = rem == null ? "" : str(rem, "username");
+            String p = SecretStore.getLoginPassword(ctx);
+            if (u.isEmpty() || p.isEmpty()) {
+                lastAuthError = "本机没有保存账号密码";
+                return false;
+            }
+
+            reloginRunning = true;
+            try {
+                loginInternal(u, p, true);
+                authGeneration++;
+                lastAuthError = "";
+                authLock.notifyAll();
+                return true;
+            } catch (ApiException e) {
+                lastAuthError = e.code == 3 ? "需要短信验证" : (e.getMessage() == null ? "重新登录失败" : e.getMessage());
+                return false;
+            } catch (Exception e) {
+                lastAuthError = e.getMessage() == null ? "重新登录失败" : e.getMessage();
+                return false;
+            } finally {
+                reloginRunning = false;
+                authLock.notifyAll();
+            }
         }
     }
 
     // ----------------------------------------------------------------- auth
     public JSONObject login(String user, String pass, boolean remember) throws Exception {
+        synchronized (authLock) {
+            JSONObject out = loginInternal(user, pass, remember);
+            authGeneration++;
+            lastAuthError = "";
+            authLock.notifyAll();
+            return out;
+        }
+    }
+
+    private JSONObject loginInternal(String user, String pass, boolean remember) throws Exception {
+        // 在发登录请求前丢弃旧会话，登录响应的 Set-Cookie 才是新会话来源。
+        clearAuthCookies();
+        resetServiceSessions();
         JSONObject p = new JSONObject();
         p.put("username", user);
         p.put("password", pass);
@@ -353,7 +445,8 @@ public class Api {
     }
 
     private void applyLogin(JSONObject d, String user) throws Exception {
-        invalidateJwxtCache();
+        // 旧 Cookie 已在发起登录前清空；保留登录响应下发的 Cookie。
+        resetServiceSessions();
         String t = str(d, "login_ticket");
         if (t.isEmpty()) t = str(d, "login_result");
         put(st, "ticket", t);
@@ -379,6 +472,16 @@ public class Api {
     }
 
     public JSONObject verifySms(String code, boolean trust) throws Exception {
+        synchronized (authLock) {
+            JSONObject out = verifySmsInternal(code, trust);
+            authGeneration++;
+            lastAuthError = "";
+            authLock.notifyAll();
+            return out;
+        }
+    }
+
+    private JSONObject verifySmsInternal(String code, boolean trust) throws Exception {
         JSONObject p = new JSONObject();
         p.put("temp_token", str(st, "temp_token"));
         p.put("imei", imei());
@@ -404,27 +507,44 @@ public class Api {
         return envelope(CHECK, p, ticket());
     }
 
-    public void logout() {
-        JSONObject prof = st.optJSONObject("profile");
-        JSONObject rem = st.optJSONObject("remember");
-        if (rem != null && str(rem, "name").isEmpty() && prof != null) {
-            try {
-                rem.put("name", str(prof, "name"));
-                rem.put("xgh", str(prof, "xgh"));
-                put(st, "remember", rem);
-            } catch (Exception ignored) {}
-        }
+    /** 启动校验：允许触发一次单飞重登，避免 UI 把过期 ticket 当成已登录。 */
+    public JSONObject validateSession() throws Exception {
+        long generation = authGeneration;
         try {
-            JSONObject p = new JSONObject();
-            call(LOGOUT, p);
-        } catch (Exception ignored) {}
-        put(st, "ticket", "");
-        put(st, "ck_lc", "");
-        put(st, "ck_vl", "");
-        put(st, "temp_token", "");
-        put(st, "profile", new JSONObject());
-        cookies.getCookieStore().removeAll();
-        save();
+            return check();
+        } catch (SessionExpired e) {
+            if (relogin(generation)) return check();
+            throw e;
+        }
+    }
+
+    public void logout() {
+        synchronized (authLock) {
+            JSONObject prof = st.optJSONObject("profile");
+            JSONObject rem = st.optJSONObject("remember");
+            if (rem != null && str(rem, "name").isEmpty() && prof != null) {
+                try {
+                    rem.put("name", str(prof, "name"));
+                    rem.put("xgh", str(prof, "xgh"));
+                    put(st, "remember", rem);
+                } catch (Exception ignored) {}
+            }
+            // 不经过 call()：登出不能触发自动重登。
+            try {
+                envelope(LOGOUT, new JSONObject(), ticket());
+            } catch (Exception ignored) {}
+            clearAuthCookies();
+            resetServiceSessions();
+            put(st, "ticket", "");
+            put(st, "ck_lc", "");
+            put(st, "ck_vl", "");
+            put(st, "temp_token", "");
+            put(st, "profile", new JSONObject());
+            authGeneration++;
+            lastAuthError = "";
+            save();
+            authLock.notifyAll();
+        }
     }
 
     // --------------------------------------------------------------- portal
@@ -684,6 +804,7 @@ public class Api {
 
     private void ecodeLogin() throws Exception {
         if (ecodeAuthed) return;
+        long generation = authGeneration;
         for (int attempt = 0; attempt < 2; attempt++) {
             String[] r = httpGetFollow(ECODE + "/api/sso/login?redirect_to=/ecode", 20);
             if (r[0].startsWith(ECODE)) {
@@ -692,7 +813,7 @@ public class Api {
                 ecodeBase = ECODE;
                 return;
             }
-            if (attempt == 0 && relogin()) continue;
+            if (attempt == 0 && relogin(generation)) continue;
             break;
         }
         // 校外：经 WebVPN 访问 ecode
@@ -954,8 +1075,9 @@ public class Api {
     }
 
     private String[] mailSso() throws Exception {
+        long generation = authGeneration;
         String[] sso = httpGetFollow(MAIL_SSO, 20);
-        if (queryParam(sso[0], "sid").isEmpty() && relogin()) {
+        if (queryParam(sso[0], "sid").isEmpty() && relogin(generation)) {
             sso = httpGetFollow(MAIL_SSO, 20);
         }
         if (queryParam(sso[0], "sid").isEmpty() && webvpnLogin()) {
@@ -1201,11 +1323,16 @@ public class Api {
     }
 
     private void payLogin() throws Exception {
-        if (payAuthed) return;
+        // 缴费会话独立于主站会话，不能仅凭进程内布尔值跳过；每次下单前都重新过 CAS。
+        payAuthed = false;
         for (int attempt = 0; attempt < 2; attempt++) {
             String[] r = httpGetFollow(PAY + "/drCasLogin", 20);
-            if (r[0].startsWith(PAY)) { payAuthed = true; return; }
-            if (attempt == 0 && relogin()) continue;
+            if (r[0].startsWith(PAY)) {
+                payAuthed = true;
+                payAuthGeneration = authGeneration;
+                return;
+            }
+            if (attempt == 0 && relogin(authGeneration)) continue;
             throw new ApiException(-1, "缴费平台登录失败");
         }
     }
@@ -1500,8 +1627,9 @@ public class Api {
     // --------------------------------------------------------------- jwapp
     boolean ensureJwxt() {
         if (jwxtOk) return true;
+        long generation = authGeneration;
         boolean ok = ensureJwxtOnce();
-        if (!ok && relogin()) {
+        if (!ok && relogin(generation)) {
             jwxtOk = false;
             webvpn = false;
             webvpnAuthed = false;
@@ -2445,13 +2573,18 @@ public class Api {
     }
 
     public void importJson(String json) throws Exception {
-        JSONObject obj = new JSONObject(json);
-        st = obj;
-        invalidateJwxtCache();
-        if (str(st, "imei").isEmpty()) st.put("imei", UUID.randomUUID().toString());
-        migrateSecrets();
-        save();
-        syncCookies(true);
+        synchronized (authLock) {
+            JSONObject obj = new JSONObject(json);
+            st = obj;
+            if (str(st, "imei").isEmpty()) st.put("imei", UUID.randomUUID().toString());
+            migrateSecrets();
+            resetServiceSessions();
+            cookies.getCookieStore().removeAll();
+            syncCookies(true);
+            authGeneration++;
+            save();
+            authLock.notifyAll();
+        }
     }
 
     // ---------------------------------------------------------------- 汇总
@@ -2617,6 +2750,8 @@ public class Api {
         put(o, "saved_name", savedName);
         put(o, "saved_xgh", savedXgh);
         put(o, "updated_at", str(st, "updated_at"));
+        put(o, "auth_error", lastAuthError);
+        put(o, "auth_generation", authGeneration);
         put(o, "demo", false);
         return o;
     }

@@ -225,7 +225,7 @@ public class Bridge {
                 return o.toString();
             }
             case "check":
-                return api.check().toString();
+                return api.validateSession().toString();
             default:
                 return err("未知操作: " + action);
         }
