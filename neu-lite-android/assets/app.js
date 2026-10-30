@@ -519,9 +519,7 @@ function renderSchedule(schedule) {
   const start = new Date((schedule.start || ymd(sundayOf(new Date()))) + "T00:00:00");
   state.weekStart = start;
   $("#weekTitle").textContent = schedule.week ? `第 ${schedule.week} 周` : "课程表";
-  const weekExamCount = examItems().filter((e) => e.date >= schedule.start && e.date <= schedule.end).length;
-  $("#weekRange").innerHTML = `${schedule.start?.slice(5)} ~ ${schedule.end?.slice(5)}` +
-    (weekExamCount ? ` <em class="weekexam">考试 ${weekExamCount}</em>` : "");
+  $("#weekRange").textContent = `${schedule.start?.slice(5)} ~ ${schedule.end?.slice(5)}`;
 
   const today = ymd(new Date());
   const days = [];
@@ -594,14 +592,15 @@ function sectionBounds(e) {
   return { start: b.start, end: Math.max(b.start, en ? en.end : b.end) };
 }
 
-function courseColor(e) {
-  const c = String(e.color || "").trim().replace(/^#/, "");
-  if (/^[0-9a-f]{6}$/i.test(c)) return `#${c}`;
-  const palette = ["#8d3d2e", "#6f604b", "#4f6b58", "#596482", "#80627d", "#7b5b3e"];
-  const s = String(e.title || "课程");
-  let n = 0;
-  for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) % 997;
-  return palette[n % palette.length];
+const COURSE_BG = ["#e7a69a", "#edc68b", "#b4d0a6", "#b3c7e6", "#ddb6d0",
+  "#ddc18e", "#a8d0c8", "#efb5a8", "#c7c0e5", "#d4dfa1", "#e5bfa5", "#bad4df"];
+
+function courseColor(e, colors) {
+  const key = String(e.title || "课程");
+  if (colors.has(key)) return colors.get(key);
+  const color = COURSE_BG[colors.size % COURSE_BG.length];
+  colors.set(key, color);
+  return color;
 }
 
 function fitTimetable(rows) {
@@ -622,15 +621,13 @@ function renderWeek(days) {
   const today = ymd(new Date());
   const weekDays = WEEK_ORDER.map((i) => days[i]);
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
-  const allExams = weekDays.flatMap((d) => examsForDate(d.date));
-  const usedEnds = events.map((e) => sectionBounds(e).end)
-    .concat(allExams.map((e) => sectionBounds(e).end));
-  const periodCount = (events.length || allExams.length)
+  const usedEnds = events.map((e) => sectionBounds(e).end);
+  const periodCount = events.length
     ? Math.min(MAX_PERIODS, Math.max(PERIOD_COUNT, ...usedEnds))
     : PERIOD_COUNT;
   // 有真实课程时，行时间完全按接口返回的上课/下课时间；没有课程时才用默认节次时间占位。
   const defaultTimes = Array.from({ length: periodCount }, (_, i) => PERIOD_START[i] || "");
-  const slotTimes = (events.length || allExams.length) ? Array(periodCount).fill("") : defaultTimes;
+  const slotTimes = events.length ? Array(periodCount).fill("") : defaultTimes;
   // 先放上课时间；同一节有多门课时取最早的上课时间。
   events.forEach((e) => {
     const b = sectionBounds(e);
@@ -647,26 +644,12 @@ function renderWeek(days) {
       slotTimes[b.end - 1] = t2;
     }
   });
-  // 考试也参与节次时间，避免有考试的行时间空白。
-  allExams.forEach((e) => {
-    const b = sectionBounds(e);
-    const t1 = e.hm || (e.start || "").slice(11, 16);
-    const t2 = e.endHm || (e.end || "").slice(11, 16);
-    if (t1 && b.start >= 1 && b.start <= slotTimes.length && !slotTimes[b.start - 1]) {
-      slotTimes[b.start - 1] = t1;
-    }
-    if (t2 && b.end >= 1 && b.end <= slotTimes.length && !slotTimes[b.end - 1]) {
-      slotTimes[b.end - 1] = t2;
-    }
-  });
 
-  const head = weekDays.map((d, i) => {
-    const exams = examsForDate(d.date);
-    return `<button class="tg-day ${d.date === today ? "today" : ""} ${exams.length ? "has-exam" : ""}"
+  const head = weekDays.map((d, i) => `
+    <button class="tg-day ${d.date === today ? "today" : ""}"
       style="grid-column:${i + 2};grid-row:1" data-date="${d.date}" type="button">
-      <b>${d.label}</b><span>${d.date.slice(5).replace("-", ".")}</span>${exams.length ? '<i class="tg-dot"></i>' : ""}
-    </button>`;
-  }).join("");
+      <b>${d.label}</b><span>${d.date.slice(5).replace("-", ".")}</span>
+    </button>`).join("");
 
   const slots = Array.from({ length: periodCount }, (_, i) => `
     <div class="tg-slot" style="grid-column:1;grid-row:${i + 2}">
@@ -679,6 +662,7 @@ function renderWeek(days) {
     ).join("")).join("");
 
   const cards = [];
+  const colors = new Map();
   weekDays.forEach((d, di) => {
     const list = [];
     events.filter((e) => (e.start || "").slice(0, 10) === d.date).forEach((e) => {
@@ -688,22 +672,10 @@ function renderWeek(days) {
       const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
       list.push({
         b,
-        html: `<div class="tg-course" style="--c:${courseColor(e)}"
+        html: `<div class="tg-course" style="--c:${courseColor(e, colors)}"
           data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
           <i class="tg-time">${esc(t1)}</i>
           <b>${esc(e.title || "未命名课程")}</b>
-          <small>${esc(meta)}</small>
-        </div>`
-      });
-    });
-    examsForDate(d.date).forEach((e) => {
-      const b = sectionBounds(e);
-      const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).join(" · ");
-      list.push({
-        b,
-        html: `<div class="tg-exam" data-date="${d.date}" title="${esc(e.title || "考试")}">
-          <i class="tg-time">${esc(e.hm || "")}</i>
-          <b>考试 · ${esc(e.title || "考试")}</b>
           <small>${esc(meta)}</small>
         </div>`
       });

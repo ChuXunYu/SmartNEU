@@ -1127,3 +1127,15 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
   vertical-align:1px}
 .g-kind.is-exam{color:var(--red);border-color:rgba(168,58,43,.45)}
 .g-kind.is-check{color:var(--celadon);border-color:rgba(90,120,100,.45)}
+
+
+/* 彩色课程块：整块同色，便于看结束位置；地点居中 */
+.tg-course{
+  background:var(--c,var(--cream));
+  border-left-color:rgba(23,20,17,.28);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+}
+.tg-course .tg-time{width:100%;text-align:center;color:rgba(23,20,17,.72)}
+.tg-course b{width:100%;text-align:center;color:var(--ink)}
+.tg-course small{width:100%;text-align:center;color:rgba(23,20,17,.72)}
+.tg-stack .tg-course{background:var(--c,var(--cream))}
