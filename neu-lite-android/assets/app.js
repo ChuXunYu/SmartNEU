@@ -908,6 +908,67 @@ $("#prevWeek").addEventListener("click", () => loadWeek(-1));
 $("#nextWeek").addEventListener("click", () => loadWeek(1));
 $("#btnThisWeek").addEventListener("click", goThisWeek);
 
+/* 周课表左右滑动切换上一周 / 下一周 */
+(() => {
+  const panel = $("#panel-schedule");
+  if (!panel) return;
+  let start = null;
+  let lastTouch = 0;
+  let blockClickUntil = 0;
+  const allowed = (target) => !(target && target.closest &&
+    target.closest("button,a,input,textarea,select,.sheet,.tabbar"));
+
+  const begin = (x, y) => {
+    if (state.view !== "week") return;
+    start = { x, y, at: Date.now() };
+  };
+  const end = (x, y) => {
+    if (!start) return;
+    const s = start;
+    start = null;
+    const dx = x - s.x;
+    const dy = y - s.y;
+    if (Date.now() - s.at > 900) return;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    if (s.x < 24 || x < 24) return; // 避开系统边缘返回手势
+    if (weekBusy) return;
+    blockClickUntil = Date.now() + 420;
+    $("#timeline").classList.add(dx < 0 ? "swipe-left" : "swipe-right");
+    setTimeout(() => $("#timeline").classList.remove("swipe-left", "swipe-right"), 260);
+    loadWeek(dx < 0 ? 1 : -1);
+  };
+
+  panel.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    lastTouch = Date.now();
+    if (!allowed(e.target)) return;
+    begin(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  panel.addEventListener("touchend", (e) => {
+    const t = e.changedTouches[0];
+    if (!t) return;
+    lastTouch = Date.now();
+    end(t.clientX, t.clientY);
+  }, { passive: true });
+
+  panel.addEventListener("mousedown", (e) => {
+    if (Date.now() - lastTouch < 800 || e.button !== 0 || !allowed(e.target)) return;
+    begin(e.clientX, e.clientY);
+  });
+  window.addEventListener("mouseup", (e) => {
+    if (Date.now() - lastTouch < 800) return;
+    end(e.clientX, e.clientY);
+  });
+
+  // 滑动后浏览器可能补发一次 click，阻止它误触课程/日期。
+  panel.addEventListener("click", (e) => {
+    if (Date.now() < blockClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+})();
+
 /* ---------------- 考试 ---------------- */
 function examParts(x) {
   const t = String(x.time || "");
