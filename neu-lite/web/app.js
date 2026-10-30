@@ -641,43 +641,54 @@ function renderWeek(days) {
       <div class="tg-cell ${d.date === today ? "today" : ""}" style="grid-column:${i + 2};grid-row:${r + 2}"></div>`
     ).join("")).join("");
 
-  const buckets = new Map();
-  const add = (d, b, html) => {
-    const key = `${d.date}|${b.start}|${b.end}`;
-    if (!buckets.has(key)) {
-      buckets.set(key, { col: colOf.get(d.date), start: b.start, end: b.end, cards: [] });
-    }
-    buckets.get(key).cards.push(html);
-  };
-
-  weekDays.forEach((d) => {
+  const cards = [];
+  weekDays.forEach((d, di) => {
+    const list = [];
     events.filter((e) => (e.start || "").slice(0, 10) === d.date).forEach((e) => {
       const b = sectionBounds(e);
       const t1 = (e.start || "").slice(11, 16);
       const t2 = (e.end || "").slice(11, 16);
       const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
-      add(d, b, `<div class="tg-course" style="--c:${courseColor(e)}"
-        data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
-        <i class="tg-time">${esc(t1)}</i>
-        <b>${esc(e.title || "未命名课程")}</b>
-        <small>${esc(meta)}</small>
-      </div>`);
+      list.push({
+        b,
+        html: `<div class="tg-course" style="--c:${courseColor(e)}"
+          data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
+          <i class="tg-time">${esc(t1)}</i>
+          <b>${esc(e.title || "未命名课程")}</b>
+          <small>${esc(meta)}</small>
+        </div>`
+      });
     });
     examsForDate(d.date).forEach((e) => {
       const b = sectionBounds(e);
       const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).join(" · ");
-      add(d, b, `<div class="tg-exam" data-date="${d.date}" title="${esc(e.title || "考试")}">
-        <i class="tg-time">${esc(e.hm || "")}</i>
-        <b>考试 · ${esc(e.title || "考试")}</b>
-        <small>${esc(meta)}</small>
-      </div>`);
+      list.push({
+        b,
+        html: `<div class="tg-exam" data-date="${d.date}" title="${esc(e.title || "考试")}">
+          <i class="tg-time">${esc(e.hm || "")}</i>
+          <b>考试 · ${esc(e.title || "考试")}</b>
+          <small>${esc(meta)}</small>
+        </div>`
+      });
     });
-  });
-
-  const cards = [...buckets.values()].map((g) => {
-    const style = `grid-column:${g.col};grid-row:${g.start + 1}/${g.end + 2}`;
-    if (g.cards.length === 1) return `<div class="tg-one" style="${style}">${g.cards[0]}</div>`;
-    return `<div class="tg-stack" style="${style}" title="${g.cards.length} 门课程重叠">${g.cards.join("")}</div>`;
+    list.sort((a, b) => a.b.start - b.b.start || a.b.end - b.b.end);
+    const clusters = [];
+    list.forEach((it) => {
+      const last = clusters[clusters.length - 1];
+      if (last && it.b.start <= last.end) {
+        last.end = Math.max(last.end, it.b.end);
+        last.items.push(it);
+      } else {
+        clusters.push({ start: it.b.start, end: it.b.end, items: [it] });
+      }
+    });
+    clusters.forEach((g) => {
+      const style = `grid-column:${di + 2};grid-row:${g.start + 1}/${g.end + 2}`;
+      const inner = g.items.map((x) => x.html).join("");
+      cards.push(g.items.length === 1
+        ? `<div class="tg-one" style="${style}">${inner}</div>`
+        : `<div class="tg-stack" style="${style}" title="${g.items.length} 门课程时间重叠">${inner}</div>`);
+    });
   });
 
   $("#timeline").innerHTML = `<div class="timetable">
