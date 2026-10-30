@@ -626,7 +626,7 @@ function renderWeek(days) {
   const usedEnds = events.map((e) => sectionBounds(e).end)
     .concat(allExams.map((e) => sectionBounds(e).end));
   const periodCount = (events.length || allExams.length)
-    ? Math.min(MAX_PERIODS, Math.max(8, ...usedEnds))
+    ? Math.min(MAX_PERIODS, Math.max(PERIOD_COUNT, ...usedEnds))
     : PERIOD_COUNT;
   // 有真实课程时，行时间完全按接口返回的上课/下课时间；没有课程时才用默认节次时间占位。
   const defaultTimes = Array.from({ length: periodCount }, (_, i) => PERIOD_START[i] || "");
