@@ -648,8 +648,8 @@ function renderWeek(days) {
       const t2 = (e.end || "").slice(11, 16);
       const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
       cards.push(`<div class="tg-course" style="grid-column:${col};grid-row:${b.start + 1}/${b.end + 2};--c:${courseColor(e)}"
-        data-date="${d.date}" title="${esc(e.title || "课程")}">
-        <i class="tg-time">${esc(t1)}${t2 ? "–" + esc(t2) : ""}</i>
+        data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
+        <i class="tg-time">${esc(t1)}</i>
         <b>${esc(e.title || "未命名课程")}</b>
         <small>${esc(meta)}</small>
       </div>`);
