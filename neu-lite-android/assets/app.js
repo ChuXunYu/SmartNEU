@@ -553,7 +553,7 @@ function renderSchedule(schedule) {
   renderExamUpNext();
 }
 
-const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // 周一 … 周日；days 里 0 是周日
+const WEEK_ORDER = [0, 1, 2, 3, 4, 5, 6]; // 沿用现有周日为首日，日期与后端周区间一致
 const PERIOD_COUNT = 12;
 const PERIOD_START = ["08:00", "08:55", "10:00", "10:55", "13:30", "14:25",
   "15:30", "16:25", "18:30", "19:25", "20:20", "21:15"];
@@ -604,6 +604,14 @@ function renderWeek(days) {
   const today = ymd(new Date());
   const weekDays = WEEK_ORDER.map((i) => days[i]);
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
+  const slotTimes = PERIOD_START.slice();
+  events.forEach((e) => {
+    const b = sectionBounds(e);
+    const tm = (e.start || "").slice(11, 16);
+    if (tm && b.start >= 1 && b.start <= slotTimes.length && (!slotTimes[b.start - 1] || tm < slotTimes[b.start - 1])) {
+      slotTimes[b.start - 1] = tm;
+    }
+  });
 
   const head = weekDays.map((d, i) => {
     const exams = examsForDate(d.date);
@@ -615,7 +623,7 @@ function renderWeek(days) {
 
   const slots = Array.from({ length: PERIOD_COUNT }, (_, i) => `
     <div class="tg-slot" style="grid-column:1;grid-row:${i + 2}">
-      <b>${i + 1}</b><span>${PERIOD_START[i]}</span>
+      <b>${i + 1}</b><span>${slotTimes[i]}</span>
     </div>`).join("");
 
   const cells = weekDays.map((d, i) =>
