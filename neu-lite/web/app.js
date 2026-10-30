@@ -604,15 +604,20 @@ function renderWeek(days) {
   const today = ymd(new Date());
   const weekDays = WEEK_ORDER.map((i) => days[i]);
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
-  const slotTimes = PERIOD_START.slice();
+  // 有真实课程时，行时间完全按接口返回的上课/下课时间；没有课程时才用默认节次时间占位。
+  const slotTimes = events.length ? Array(PERIOD_COUNT).fill("") : PERIOD_START.slice();
   const slotSeen = new Set();
   events.forEach((e) => {
     const b = sectionBounds(e);
-    const tm = (e.start || "").slice(11, 16);
-    if (!tm || b.start < 1 || b.start > slotTimes.length) return;
-    if (!slotSeen.has(b.start) || tm < slotTimes[b.start - 1]) {
-      slotTimes[b.start - 1] = tm;
+    const t1 = (e.start || "").slice(11, 16);
+    const t2 = (e.end || "").slice(11, 16);
+    if (t1 && b.start >= 1 && b.start <= slotTimes.length && !slotSeen.has(b.start)) {
+      slotTimes[b.start - 1] = t1;
       slotSeen.add(b.start);
+    }
+    if (t2 && b.end >= 1 && b.end <= slotTimes.length && !slotSeen.has(b.end)) {
+      slotTimes[b.end - 1] = t2;
+      slotSeen.add(b.end);
     }
   });
 

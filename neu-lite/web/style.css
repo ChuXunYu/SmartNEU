@@ -1055,7 +1055,7 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .tg-time{display:block;font-style:normal;font-size:7px;line-height:1.1;letter-spacing:0;
   color:var(--c,var(--red));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px}
 .tg-exam .tg-time{color:var(--red)}
-.tg-course .tg-time{display:none}
+.tg-course .tg-time{display:block;font-size:6.5px;color:var(--muted);margin-bottom:1px;letter-spacing:0}
 .tg-course b,.tg-exam b{display:-webkit-box;font-size:9.5px;line-height:1.16;font-weight:600;color:var(--ink);
   overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;word-break:break-all}
 .tg-course small,.tg-exam small{display:block;margin-top:1px;font-size:7px;line-height:1.15;color:var(--muted);
