@@ -553,42 +553,119 @@ function renderSchedule(schedule) {
   renderExamUpNext();
 }
 
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // 周一 … 周日；days 里 0 是周日
+const PERIOD_COUNT = 12;
+const PERIOD_START = ["08:00", "08:55", "10:00", "10:55", "13:30", "14:25",
+  "15:30", "16:25", "18:30", "19:25", "20:20", "21:15"];
+
+function sectionFromClock(hm) {
+  const m = String(hm || "").match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const t = Number(m[1]) * 60 + Number(m[2]);
+  const pairs = [
+    [1, 2, 0, 9 * 60 + 59],
+    [3, 4, 10 * 60, 11 * 60 + 59],
+    [5, 6, 13 * 60, 15 * 60 + 19],
+    [7, 8, 15 * 60 + 20, 17 * 60 + 19],
+    [9, 10, 18 * 60, 20 * 60 + 19],
+    [11, 12, 20 * 60 + 20, 24 * 60],
+  ];
+  const p = pairs.find((x) => t >= x[2] && t <= x[3]) || pairs[pairs.length - 1];
+  return { start: p[0], end: p[1] };
+}
+
+function sectionBounds(e) {
+  const bs = Number(e.begin_section || 0);
+  const es = Number(e.end_section || 0);
+  if (bs >= 1 && bs <= PERIOD_COUNT) {
+    return { start: bs, end: Math.min(PERIOD_COUNT, Math.max(bs, es || bs)) };
+  }
+  const m = String(e.sections || "").match(/(\d+)\s*[-–—]\s*(\d+)/);
+  if (m) {
+    const a = Math.max(1, Math.min(PERIOD_COUNT, Number(m[1])));
+    const b = Math.max(a, Math.min(PERIOD_COUNT, Number(m[2])));
+    return { start: a, end: b };
+  }
+  return sectionFromClock((e.start || "").slice(11, 16) || e.hm) || { start: 1, end: 2 };
+}
+
+function courseColor(e) {
+  const c = String(e.color || "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{6}$/i.test(c)) return `#${c}`;
+  const palette = ["#8d3d2e", "#6f604b", "#4f6b58", "#596482", "#80627d", "#7b5b3e"];
+  const s = String(e.title || "课程");
+  let n = 0;
+  for (let i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) % 997;
+  return palette[n % palette.length];
+}
+
 function renderWeek(days) {
   const events = state.schedule?.events || [];
   const today = ymd(new Date());
-  const blocks = days.map((d, i) => {
-    const evs = events.filter((e) => (e.start || "").slice(0, 10) === d.date);
+  const weekDays = WEEK_ORDER.map((i) => days[i]);
+  const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
+
+  const head = weekDays.map((d, i) => {
     const exams = examsForDate(d.date);
-    const all = [
-      ...evs.map((e) => ({ kind: "course", start: e.start || "", data: e })),
-      ...exams.map((e) => ({ kind: "exam", start: e.start || "", data: e })),
-    ].sort((a, b) => a.start.localeCompare(b.start));
-    const rows = all.length
-      ? all.map((it) => {
-          if (it.kind === "exam") {
-            const e = it.data;
-            const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).map(esc).join(" · ");
-            return `<div class="wdev wexam"><span class="t">${esc(e.hm || "")}</span><span class="n"><i class="wtag">考</i>${esc(e.title)}</span><span class="m">${meta}</span></div>`;
-          }
-          const e = it.data;
-          const t = (e.start || "").slice(11, 16);
-          const meta = [e.location, e.teacher].filter(Boolean).map(esc).join(" · ");
-          return `<div class="wdev"><span class="t">${t}</span><span class="n">${esc(e.title || "课程")}</span><span class="m">${meta}</span></div>`;
-        }).join("")
-      : `<div class="wdempty">无课</div>`;
-    return `<div class="weekday ${d.date === today ? "today" : ""} ${exams.length ? "has-exam" : ""}">
-      <button class="wdhead" data-i="${i}"><b>${d.label}</b><span>${d.date.slice(5)}</span>${exams.length ? '<i class="wd-exam-dot"></i>' : ""}</button>
-      <div class="wdbody">${rows}</div>
-    </div>`;
+    return `<button class="tg-day ${d.date === today ? "today" : ""} ${exams.length ? "has-exam" : ""}"
+      style="grid-column:${i + 2};grid-row:1" data-date="${d.date}" type="button">
+      <b>${d.label}</b><span>${d.date.slice(5).replace("-", ".")}</span>${exams.length ? '<i class="tg-dot"></i>' : ""}
+    </button>`;
   }).join("");
-  $("#timeline").innerHTML = `<div class="weekview">${blocks}</div>`;
-  $$("#timeline .wdhead").forEach((b) => b.addEventListener("click", () => {
-    state.selectedDay = Number(b.dataset.i);
-    state.view = "day";
-    try { localStorage.setItem("neu.schedule.view", "day"); } catch {}
-    applyViewUI();
-    renderSchedule(state.schedule);
-  }));
+
+  const slots = Array.from({ length: PERIOD_COUNT }, (_, i) => `
+    <div class="tg-slot" style="grid-column:1;grid-row:${i + 2}">
+      <b>${i + 1}</b><span>${PERIOD_START[i]}</span>
+    </div>`).join("");
+
+  const cells = weekDays.map((d, i) =>
+    Array.from({ length: PERIOD_COUNT }, (_, r) => `
+      <div class="tg-cell ${d.date === today ? "today" : ""}" style="grid-column:${i + 2};grid-row:${r + 2}"></div>`
+    ).join("")).join("");
+
+  const cards = [];
+  weekDays.forEach((d) => {
+    const col = colOf.get(d.date);
+    events.filter((e) => (e.start || "").slice(0, 10) === d.date).forEach((e) => {
+      const b = sectionBounds(e);
+      const t1 = (e.start || "").slice(11, 16);
+      const t2 = (e.end || "").slice(11, 16);
+      const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
+      cards.push(`<div class="tg-course" style="grid-column:${col};grid-row:${b.start + 1}/${b.end + 2};--c:${courseColor(e)}"
+        data-date="${d.date}" title="${esc(e.title || "课程")}">
+        <i class="tg-time">${esc(t1)}${t2 ? "–" + esc(t2) : ""}</i>
+        <b>${esc(e.title || "未命名课程")}</b>
+        <small>${esc(meta)}</small>
+      </div>`);
+    });
+    examsForDate(d.date).forEach((e) => {
+      const b = sectionBounds(e);
+      const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).join(" · ");
+      cards.push(`<div class="tg-exam" style="grid-column:${col};grid-row:${b.start + 1}/${b.end + 2}"
+        data-date="${d.date}" title="${esc(e.title || "考试")}">
+        <i class="tg-time">${esc(e.hm || "")}</i>
+        <b>考试 · ${esc(e.title || "考试")}</b>
+        <small>${esc(meta)}</small>
+      </div>`);
+    });
+  });
+
+  $("#timeline").innerHTML = `<div class="timetable">
+    <div class="tg-corner" style="grid-column:1;grid-row:1"><b>节</b><span>时间</span></div>
+    ${head}${slots}${cells}${cards.join("")}
+  </div>`;
+
+  $$("#timeline .tg-day, #timeline .tg-course, #timeline .tg-exam").forEach((el) => {
+    el.addEventListener("click", () => {
+      const idx = days.findIndex((d) => d.date === el.dataset.date);
+      if (idx < 0) return;
+      state.selectedDay = idx;
+      state.view = "day";
+      try { localStorage.setItem("neu.schedule.view", "day"); } catch {}
+      applyViewUI();
+      renderSchedule(state.schedule);
+    });
+  });
 }
 
 function applyViewUI() {

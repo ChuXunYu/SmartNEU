@@ -2130,6 +2130,10 @@ public class Api {
                     put(ev, "desc", str(c, "weeks_text"));
                     put(ev, "teacher", str(c, "teacher"));
                     put(ev, "color", str(c, "color"));
+                    put(ev, "begin_section", c.optInt("begin_section", 0));
+                    put(ev, "end_section", c.optInt("end_section", 0));
+                    put(ev, "sections", c.optInt("begin_section", 0) > 0
+                            ? c.optInt("begin_section", 0) + "-" + c.optInt("end_section", 0) : "");
                     evs.add(ev);
                 }
             }

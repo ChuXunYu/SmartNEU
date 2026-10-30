@@ -1008,3 +1008,61 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .runpanel-note{font-size:9px;line-height:1.8;color:var(--muted);margin:0 0 24px;letter-spacing:.3px}
 .runpanel .btn-primary{margin-bottom:8px}
 .runpanel-state{font-size:9px;color:var(--muted);line-height:1.7;margin-top:10px;min-height:14px}
+
+
+/* 二维周课表：周一 → 周日，纵向为节次 */
+.timetable{
+  display:grid;
+  grid-template-columns:38px repeat(7,minmax(0,1fr));
+  grid-template-rows:46px repeat(12,44px);
+  margin-top:2px;
+  border-top:1px solid var(--line);
+  border-left:1px solid var(--line);
+  background:var(--paper);
+  overflow:hidden;
+}
+.tg-corner,.tg-day,.tg-slot,.tg-cell{border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.tg-corner{
+  grid-row:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;color:var(--muted);font-size:8px;letter-spacing:.5px;background:var(--cream);
+}
+.tg-corner b{font-family:var(--serif);font-size:12px;color:var(--ink);font-weight:600}
+.tg-corner span{font-size:7px}
+.tg-day{
+  grid-row:1;appearance:none;border:0;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
+  background:transparent;padding:5px 1px 4px;text-align:center;cursor:pointer;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;
+}
+.tg-day b{font-family:var(--serif);font-size:11px;font-weight:600;letter-spacing:.5px;line-height:1.15}
+.tg-day span{font-size:7px;color:var(--muted);letter-spacing:.2px}
+.tg-day.today b,.tg-day.today span{color:var(--red)}
+.tg-day.has-exam span{color:var(--red)}
+.tg-dot{position:absolute;right:5px;top:5px;width:4px;height:4px;border-radius:50%;background:var(--red)}
+.tg-slot{
+  grid-column:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:var(--cream);color:var(--muted);
+}
+.tg-slot b{font-family:var(--serif);font-size:11px;color:var(--ink);font-weight:600;line-height:1}
+.tg-slot span{font-size:6.5px;letter-spacing:0;transform:scale(.92)}
+.tg-cell{background:transparent}
+.tg-cell.today{background:rgba(168,58,43,.035)}
+.tg-course,.tg-exam{
+  z-index:2;min-width:0;min-height:0;margin:2px 1px;padding:3px 3px 2px;overflow:hidden;cursor:pointer;
+  background:var(--paper);border-left:2px solid var(--c,var(--red));border-radius:1px;
+  box-shadow:0 1px 0 rgba(58,45,32,.06),0 0 0 1px rgba(58,45,32,.04);
+}
+.tg-exam{background:#fbf1e8;border-left-color:var(--red)}
+.tg-time{display:block;font-style:normal;font-size:7px;line-height:1.1;letter-spacing:0;
+  color:var(--c,var(--red));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px}
+.tg-exam .tg-time{color:var(--red)}
+.tg-course .tg-time{display:none}
+.tg-course b,.tg-exam b{display:-webkit-box;font-size:9.5px;line-height:1.16;font-weight:600;color:var(--ink);
+  overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;word-break:break-all}
+.tg-course small,.tg-exam small{display:block;margin-top:1px;font-size:7px;line-height:1.15;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-exam b{color:var(--red)}
+@media (min-width:520px){
+  .timetable{grid-template-columns:46px repeat(7,minmax(0,1fr));grid-template-rows:50px repeat(12,48px)}
+  .tg-course b,.tg-exam b{font-size:10px}
+  .tg-course small,.tg-exam small{font-size:8px}
+}
