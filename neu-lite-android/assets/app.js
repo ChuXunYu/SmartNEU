@@ -437,10 +437,10 @@ function statsFor(tab) {
 
 function renderStats(tab = state.tab, animate = true) {
   const led = $("#ledger");
-  if (tab === "net" || tab === "card" || tab === "run") { led.classList.add("hidden"); return; }
+  if (tab !== "card") { led.classList.add("hidden"); return; }
   led.classList.remove("hidden");
   const paint = () => {
-    const cells = statsFor(tab);
+    const cells = statsFor("schedule");
     for (let i = 0; i < 3; i++) {
       const c = cells[i] || { v: "—", l: "" };
       $("#st" + (i + 1)).textContent = c.v;
@@ -555,6 +555,7 @@ function renderSchedule(schedule) {
 
 const WEEK_ORDER = [0, 1, 2, 3, 4, 5, 6]; // 沿用现有周日为首日，日期与后端周区间一致
 const PERIOD_COUNT = 12;
+const MAX_PERIODS = 14;
 const PERIOD_START = ["08:00", "08:55", "10:00", "10:55", "13:30", "14:25",
   "15:30", "16:25", "18:30", "19:25", "20:20", "21:15"];
 
@@ -577,13 +578,13 @@ function sectionFromClock(hm) {
 function sectionBounds(e) {
   const bs = Number(e.begin_section || 0);
   const es = Number(e.end_section || 0);
-  if (bs >= 1 && bs <= PERIOD_COUNT) {
-    return { start: bs, end: Math.min(PERIOD_COUNT, Math.max(bs, es || bs)) };
+  if (bs >= 1 && bs <= MAX_PERIODS) {
+    return { start: bs, end: Math.min(MAX_PERIODS, Math.max(bs, es || bs)) };
   }
   const m = String(e.sections || "").match(/(\d+)\s*[-–—]\s*(\d+)/);
   if (m) {
-    const a = Math.max(1, Math.min(PERIOD_COUNT, Number(m[1])));
-    const b = Math.max(a, Math.min(PERIOD_COUNT, Number(m[2])));
+    const a = Math.max(1, Math.min(MAX_PERIODS, Number(m[1])));
+    const b = Math.max(a, Math.min(MAX_PERIODS, Number(m[2])));
     return { start: a, end: b };
   }
   const startHm = (e.start || "").slice(11, 16) || e.hm;
@@ -608,8 +609,15 @@ function renderWeek(days) {
   const today = ymd(new Date());
   const weekDays = WEEK_ORDER.map((i) => days[i]);
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
+  const allExams = weekDays.flatMap((d) => examsForDate(d.date));
+  const usedEnds = events.map((e) => sectionBounds(e).end)
+    .concat(allExams.map((e) => sectionBounds(e).end));
+  const periodCount = (events.length || allExams.length)
+    ? Math.min(MAX_PERIODS, Math.max(8, ...usedEnds))
+    : PERIOD_COUNT;
   // 有真实课程时，行时间完全按接口返回的上课/下课时间；没有课程时才用默认节次时间占位。
-  const slotTimes = events.length ? Array(PERIOD_COUNT).fill("") : PERIOD_START.slice();
+  const defaultTimes = Array.from({ length: periodCount }, (_, i) => PERIOD_START[i] || "");
+  const slotTimes = (events.length || allExams.length) ? Array(periodCount).fill("") : defaultTimes;
   // 先放上课时间；同一节有多门课时取最早的上课时间。
   events.forEach((e) => {
     const b = sectionBounds(e);
@@ -635,13 +643,13 @@ function renderWeek(days) {
     </button>`;
   }).join("");
 
-  const slots = Array.from({ length: PERIOD_COUNT }, (_, i) => `
+  const slots = Array.from({ length: periodCount }, (_, i) => `
     <div class="tg-slot" style="grid-column:1;grid-row:${i + 2}">
       <b>${i + 1}</b><span>${slotTimes[i]}</span>
     </div>`).join("");
 
   const cells = weekDays.map((d, i) =>
-    Array.from({ length: PERIOD_COUNT }, (_, r) => `
+    Array.from({ length: periodCount }, (_, r) => `
       <div class="tg-cell ${d.date === today ? "today" : ""}" style="grid-column:${i + 2};grid-row:${r + 2}"></div>`
     ).join("")).join("");
 
@@ -695,7 +703,7 @@ function renderWeek(days) {
     });
   });
 
-  $("#timeline").innerHTML = `<div class="timetable">
+  $("#timeline").innerHTML = `<div class="timetable" style="grid-template-rows:46px repeat(${periodCount},44px)">
     <div class="tg-corner" style="grid-column:1;grid-row:1"><b>节</b><span>时间</span></div>
     ${head}${slots}${cells}${cards.join("")}
   </div>`;

@@ -667,7 +667,7 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 .mailattach{font-size:10px;color:var(--muted);letter-spacing:.4px;border-top:1px solid var(--line-soft);padding-top:12px}
 
 /* ---------------- 校园卡：聚焦通行码页 ---------------- */
-body.card-mode .hello,body.card-mode #ledger,body.card-mode #updatedAt{display:none}
+body.card-mode .hello{display:none}
 body.card-mode .masthead{padding-bottom:8px}
 body.card-mode .app{padding-bottom:82px}
 body.card-mode main{padding-bottom:0}
@@ -1074,3 +1074,35 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .tg-stack .tg-course b,.tg-stack .tg-exam b{font-size:8px;line-height:1.1}
 .tg-stack .tg-course small,.tg-stack .tg-exam small{font-size:6.5px}
 .tg-stack .tg-course .tg-time,.tg-stack .tg-exam .tg-time{font-size:6px}
+
+
+/* 顶部只保留品牌/入口；时间与问候移入校园卡 */
+.masthead{padding:10px 18px 8px}
+.topline{padding-bottom:0}
+.brand-name{font-size:15px;letter-spacing:3px}
+.brand-sub{font-size:8px;letter-spacing:2.2px}
+.hero-actions{gap:10px}
+.mailbtn,.morebtn{min-height:34px}
+body.card-mode .masthead{padding:10px 18px 8px}
+
+.cardwelcome{padding:16px 2px 8px}
+.cardwelcome .kicker{font-size:8.5px;letter-spacing:2.2px}
+.cardwelcome h1#greet{font-size:27px;line-height:1.25;margin:6px 0 5px;letter-spacing:1.4px}
+.cardwelcome .who{font-size:9.5px;letter-spacing:1px}
+#panel-card #ledger{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:6px 0 4px;
+  padding:9px 0;background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+#panel-card #ledger.hidden{display:none}
+#panel-card #ledger .cell{padding:0 9px 0 0}
+#panel-card #ledger .cell:last-child{padding-left:12px}
+#panel-card #ledger .cell b{font-size:20px}
+#panel-card #ledger .cell span{font-size:8px;letter-spacing:1.2px}
+#panel-card #updatedAt{margin:0 0 2px;padding:4px 0 6px;border:0;background:transparent;min-height:0}
+#panel-card .section-head{margin:10px 0 8px}
+
+/* 课表与考试在移除顶部问候后占满并居中 */
+body.roomy-top main{padding-left:10px;padding-right:10px}
+#panel-schedule,#panel-exams{width:100%;max-width:760px;margin:0 auto}
+#panel-schedule .timetable{width:100%;margin-left:auto;margin-right:auto}
+#panel-exams .examlist{width:100%;max-width:620px;margin:0 auto}
+#panel-exams{min-height:calc(100dvh - 150px);display:flex;flex-direction:column}
+#panel-exams .examlist{margin-top:auto;margin-bottom:auto}
