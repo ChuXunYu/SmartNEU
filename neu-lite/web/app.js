@@ -617,6 +617,7 @@ function fitTimetable(rows) {
 }
 
 function renderWeek(days) {
+  $("#examUpNext").classList.add("hidden");
   const events = state.schedule?.events || [];
   const today = ymd(new Date());
   const weekDays = WEEK_ORDER.map((i) => days[i]);
