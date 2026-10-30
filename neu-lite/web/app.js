@@ -387,7 +387,7 @@ async function boot() {
 }
 
 async function validateSessionInBackground() {
-  if (!state.session || !state.session.logged_in) return;
+  if (!state.session || !state.session.logged_in || state.session.demo) return;
   try {
     const chk = await withTimeout(api("/api/check", { method: "POST" }), 8000, "会话校验超时");
     if (chk && (chk.status === "expired" || chk.e === 10013)) showSessionExpired();
