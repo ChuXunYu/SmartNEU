@@ -11,7 +11,7 @@ adb install -r 日在NEU.apk
 或从 [Releases](https://git.aizhangz.shop/aizhangz/SmartNEU/releases) 下载 APK 后传到手机点击安装（允许“安装未知来源应用”）。
 
 - 包名：`com.neulite.app`
-- 版本：`0.2.1`（versionCode 9）
+- 版本：`0.3.0`（versionCode 10）
 - minSdk 24 / targetSdk 34
 - 签名：自签名 `CN=neu-lite, C=CN`；升级需使用同一签名
 
