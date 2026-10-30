@@ -478,6 +478,7 @@ function examsForDate(date) {
 function renderExamUpNext() {
   const box = $("#examUpNext");
   if (!box) return;
+  if (state.view === "week") { box.classList.add("hidden"); return; }
   const ws = state.weekStart ? ymd(state.weekStart) : "";
   const we = ws ? ymd(new Date(state.weekStart.getTime() + 6 * 86400000)) : "";
   const today = ymd(new Date());
@@ -594,31 +595,31 @@ function sectionBounds(e) {
 
 const COURSE_BG = ["#e7a69a", "#edc68b", "#b4d0a6", "#b3c7e6", "#ddb6d0",
   "#ddc18e", "#a8d0c8", "#efb5a8", "#c7c0e5", "#d4dfa1", "#e5bfa5", "#bad4df"];
+const COURSE_COLOR_MAP = new Map();
 
-function courseColor(e, colors) {
+function courseColor(e) {
   const key = String(e.title || "课程");
-  if (colors.has(key)) return colors.get(key);
-  const color = COURSE_BG[colors.size % COURSE_BG.length];
-  colors.set(key, color);
+  if (COURSE_COLOR_MAP.has(key)) return COURSE_COLOR_MAP.get(key);
+  const color = COURSE_BG[COURSE_COLOR_MAP.size % COURSE_BG.length];
+  COURSE_COLOR_MAP.set(key, color);
   return color;
 }
 
 function fitTimetable(rows) {
-  const grid = $("#timeline .timetable");
+  const grids = $$("#timeline .timetable");
   const tab = $(".tabbar");
-  if (!grid || !tab || !rows) return;
-  const top = grid.getBoundingClientRect().top;
+  if (!grids.length || !tab || !rows) return;
+  const top = grids[0].getBoundingClientRect().top;
   const bottom = tab.getBoundingClientRect().top;
   const available = bottom - top - 6;
   if (available < 120) return;
   const header = 42;
   const height = Math.max(28, Math.min(46, Math.floor((available - header) / rows)));
-  grid.style.gridTemplateRows = `${header}px repeat(${rows}, ${height}px)`;
+  grids.forEach((grid) => { grid.style.gridTemplateRows = `${header}px repeat(${rows}, ${height}px)`; });
 }
 
-function renderWeek(days) {
-  $("#examUpNext").classList.add("hidden");
-  const events = state.schedule?.events || [];
+function weekHtmlFor(days, schedule) {
+  const events = schedule?.events || [];
   const today = ymd(new Date());
   const weekDays = WEEK_ORDER.map((i) => days[i]);
   const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
@@ -663,7 +664,6 @@ function renderWeek(days) {
     ).join("")).join("");
 
   const cards = [];
-  const colors = new Map();
   weekDays.forEach((d, di) => {
     const list = [];
     events.filter((e) => (e.start || "").slice(0, 10) === d.date).forEach((e) => {
@@ -673,7 +673,7 @@ function renderWeek(days) {
       const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
       list.push({
         b,
-        html: `<div class="tg-course" style="--c:${courseColor(e, colors)}"
+        html: `<div class="tg-course" style="--c:${courseColor(e)}"
           data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
           <i class="tg-time">${esc(t1)}</i>
           <b>${esc(e.title || "未命名课程")}</b>
@@ -701,14 +701,17 @@ function renderWeek(days) {
     });
   });
 
-  $("#timeline").innerHTML = `<div class="timetable" style="grid-template-rows:46px repeat(${periodCount},44px)">
-    <div class="tg-corner" style="grid-column:1;grid-row:1"><b>节</b><span>时间</span></div>
-    ${head}${slots}${cells}${cards.join("")}
-  </div>`;
+  return {
+    periodCount,
+    html: `<div class="timetable" style="grid-template-rows:46px repeat(${periodCount},44px)">
+      <div class="tg-corner" style="grid-column:1;grid-row:1"><b>节</b><span>时间</span></div>
+      ${head}${slots}${cells}${cards.join("")}
+    </div>`
+  };
+}
 
-  requestAnimationFrame(() => fitTimetable(periodCount));
-
-  $$("#timeline .tg-day, #timeline .tg-course, #timeline .tg-exam").forEach((el) => {
+function bindWeekCards(root, days) {
+  root.querySelectorAll(".tg-day,.tg-course,.tg-exam").forEach((el) => {
     el.addEventListener("click", () => {
       const idx = days.findIndex((d) => d.date === el.dataset.date);
       if (idx < 0) return;
@@ -719,6 +722,24 @@ function renderWeek(days) {
       renderSchedule(state.schedule);
     });
   });
+}
+
+function daysFromSchedule(schedule) {
+  const start = new Date((schedule.start || ymd(sundayOf(new Date()))) + "T00:00:00");
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start.getTime() + i * 86400000);
+    days.push({ date: ymd(d), label: WEEK_NAMES[d.getDay()], dayNum: d.getDate() });
+  }
+  return days;
+}
+
+function renderWeek(days) {
+  $("#examUpNext").classList.add("hidden");
+  const page = weekHtmlFor(days, state.schedule);
+  $("#timeline").innerHTML = page.html;
+  bindWeekCards($("#timeline"), days);
+  requestAnimationFrame(() => fitTimetable(page.periodCount));
 }
 
 function applyViewUI() {
@@ -908,7 +929,7 @@ $("#prevWeek").addEventListener("click", () => loadWeek(-1));
 $("#nextWeek").addEventListener("click", () => loadWeek(1));
 $("#btnThisWeek").addEventListener("click", goThisWeek);
 
-/* 周课表跟手横向滑动，松手吸附到上一周 / 下一周 */
+/* 周课表跟手横向滑动：当前周和相邻周并排，松手吸附 */
 (() => {
   const panel = $("#panel-schedule");
   const timeline = $("#timeline");
@@ -920,22 +941,36 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
 
   const allowed = (target) => !(target && target.closest &&
     target.closest("button,a,input,textarea,select,.sheet,.tabbar"));
-
-  const setX = (x) => {
-    timeline.style.transform = `translate3d(${x}px,0,0)`;
-  };
-
-  const springBack = () => {
-    timeline.style.transition = "transform .22s cubic-bezier(.22,.61,.36,1)";
-    setX(0);
-    setTimeout(() => { timeline.style.transition = ""; }, 240);
-  };
+  const viewWidth = () => timeline.clientWidth || panel.clientWidth || 360;
 
   const begin = (x, y) => {
     if (state.view !== "week" || weekBusy) return;
     clearTimeout(snapTimer);
-    drag = { x, y, horiz: false };
-    timeline.style.transition = "none";
+    drag = { x, y, horiz: false, track: null };
+  };
+
+  const buildTrack = (dir) => {
+    if (drag.adj) return true;
+    const anchor = new Date((state.weekStart || sundayOf(new Date())).getTime() + dir * 7 * 86400000);
+    const adjacent = computeWeek(anchor);
+    if (!adjacent) return false;
+    const days = daysFromSchedule(adjacent);
+    const currentHtml = timeline.innerHTML;
+    const adjacentHtml = weekHtmlFor(days, adjacent).html;
+    const pages = dir > 0 ? [currentHtml, adjacentHtml] : [adjacentHtml, currentHtml];
+    const track = document.createElement("div");
+    track.className = "week-track";
+    track.innerHTML = pages.map((html) => `<div class="week-page">${html}</div>`).join("");
+    timeline.innerHTML = "";
+    timeline.appendChild(track);
+    drag.track = track;
+    drag.adj = adjacent;
+    drag.dir = dir;
+    drag.currentHtml = currentHtml;
+    drag.base = dir > 0 ? 0 : -viewWidth();
+    track.style.transform = `translate3d(${drag.base}px,0,0)`;
+    requestAnimationFrame(() => fitTimetable(12));
+    return true;
   };
 
   const move = (x, y, ev) => {
@@ -945,10 +980,20 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     if (!drag.horiz) {
       if (Math.abs(dx) < 8) return;
       if (Math.abs(dx) <= Math.abs(dy) * 1.2) { drag = null; return; }
+      if (!buildTrack(dx < 0 ? 1 : -1)) { drag = null; return; }
       drag.horiz = true;
     }
     if (ev && ev.cancelable) ev.preventDefault();
-    setX(dx);
+    const max = viewWidth();
+    const offset = Math.max(-max, Math.min(max, dx));
+    drag.track.style.transform = `translate3d(${drag.base + offset}px,0,0)`;
+  };
+
+  const restoreCurrent = (html) => {
+    timeline.innerHTML = html;
+    timeline.style.transform = "";
+    bindWeekCards(timeline, daysFromSchedule(state.schedule));
+    requestAnimationFrame(() => fitTimetable(12));
   };
 
   const finish = (x) => {
@@ -957,27 +1002,25 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
     const dx = x - d.x;
     const horiz = d.horiz;
     drag = null;
-    if (!horiz) return;
+    if (!horiz || !d.track) return;
     blockClickUntil = Date.now() + 520;
-    const width = timeline.clientWidth || panel.clientWidth || 360;
-    if (Math.abs(dx) < Math.max(56, width * 0.22)) {
-      springBack();
-      return;
-    }
-    const dir = dx < 0 ? 1 : -1; // 左滑下一周，右滑上一周
-    const out = dir > 0 ? -width : width;
-    timeline.style.transition = "transform .22s cubic-bezier(.22,.61,.36,1)";
-    setX(out);
+    const width = viewWidth();
+    const threshold = Math.max(56, width * 0.22);
+    const go = d.dir > 0 ? dx < -threshold : dx > threshold;
+    const target = go ? (d.dir > 0 ? -width : 0) : d.base;
+    d.track.style.transition = "transform .22s cubic-bezier(.22,.61,.36,1)";
+    d.track.style.transform = `translate3d(${target}px,0,0)`;
     snapTimer = setTimeout(() => {
-      loadWeek(dir);
-      timeline.style.transition = "none";
-      setX(-out);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        timeline.style.transition = "transform .24s cubic-bezier(.22,.61,.36,1)";
-        setX(0);
-        setTimeout(() => { timeline.style.transition = ""; }, 260);
-      }));
-    }, 205);
+      if (go) {
+        state.schedule = d.adj;
+        state.weekStart = new Date(d.adj.start + "T00:00:00");
+        state.selectedDay = null;
+        renderSchedule(d.adj);
+      } else {
+        restoreCurrent(d.currentHtml);
+      }
+      timeline.style.transition = "";
+    }, 220);
   };
 
   panel.addEventListener("touchstart", (e) => {
@@ -1000,7 +1043,11 @@ $("#btnThisWeek").addEventListener("click", goThisWeek);
   }, { passive: true });
 
   panel.addEventListener("touchcancel", () => {
-    if (drag) { drag = null; springBack(); }
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (d.track) d.track.style.transform = `translate3d(${d.base}px,0,0)`;
+    setTimeout(() => restoreCurrent(d.currentHtml), 220);
   });
 
   panel.addEventListener("mousedown", (e) => {
