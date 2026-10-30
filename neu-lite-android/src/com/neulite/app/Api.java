@@ -2130,6 +2130,10 @@ public class Api {
                     put(ev, "desc", str(c, "weeks_text"));
                     put(ev, "teacher", str(c, "teacher"));
                     put(ev, "color", str(c, "color"));
+                    put(ev, "begin_section", c.optInt("begin_section", 0));
+                    put(ev, "end_section", c.optInt("end_section", 0));
+                    put(ev, "sections", c.optInt("begin_section", 0) > 0
+                            ? c.optInt("begin_section", 0) + "-" + c.optInt("end_section", 0) : "");
                     evs.add(ev);
                 }
             }
@@ -2194,6 +2198,9 @@ public class Api {
                 put(g, "gpa", str(r, "JD"));
                 put(g, "term", r.optString("XNXQDM_DISPLAY", str(r, "XNXQDM")));
                 put(g, "type", str(r, "KCXZDM_DISPLAY"));
+                // KSLXDM_DISPLAY/考核方式通常是考试课/考查课，课程性质仍保留在 type。
+                put(g, "exam_type", first(r, "KSLXDM_DISPLAY", "KSFSDM_DISPLAY",
+                        "KHFSDM_DISPLAY", "考核方式", "考试类型", "考核类型"));
                 put(g, "passed", str(r, "SFJG_DISPLAY"));
                 items.put(g);
             }

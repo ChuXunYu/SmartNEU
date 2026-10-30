@@ -667,7 +667,7 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 .mailattach{font-size:10px;color:var(--muted);letter-spacing:.4px;border-top:1px solid var(--line-soft);padding-top:12px}
 
 /* ---------------- 校园卡：聚焦通行码页 ---------------- */
-body.card-mode .hello,body.card-mode #ledger,body.card-mode #updatedAt{display:none}
+body.card-mode .hello{display:none}
 body.card-mode .masthead{padding-bottom:8px}
 body.card-mode .app{padding-bottom:82px}
 body.card-mode main{padding-bottom:0}
@@ -1008,3 +1008,148 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .runpanel-note{font-size:9px;line-height:1.8;color:var(--muted);margin:0 0 24px;letter-spacing:.3px}
 .runpanel .btn-primary{margin-bottom:8px}
 .runpanel-state{font-size:9px;color:var(--muted);line-height:1.7;margin-top:10px;min-height:14px}
+
+
+/* 二维周课表：周一 → 周日，纵向为节次 */
+.timetable{
+  display:grid;
+  grid-template-columns:38px repeat(7,minmax(0,1fr));
+  grid-template-rows:46px repeat(12,44px);
+  margin-top:2px;
+  border-top:1px solid var(--line);
+  border-left:1px solid var(--line);
+  background:var(--paper);
+  overflow:hidden;
+}
+.tg-corner,.tg-day,.tg-slot,.tg-cell{border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.tg-corner{
+  grid-row:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;color:var(--muted);font-size:8px;letter-spacing:.5px;background:var(--cream);
+}
+.tg-corner b{font-family:var(--serif);font-size:12px;color:var(--ink);font-weight:600}
+.tg-corner span{font-size:7px}
+.tg-day{
+  grid-row:1;appearance:none;border:0;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
+  background:transparent;padding:5px 1px 4px;text-align:center;cursor:pointer;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;
+}
+.tg-day b{font-family:var(--serif);font-size:11px;font-weight:600;letter-spacing:.5px;line-height:1.15}
+.tg-day span{font-size:7px;color:var(--muted);letter-spacing:.2px}
+.tg-day.today b,.tg-day.today span{color:var(--red)}
+.tg-day.has-exam span{color:var(--red)}
+.tg-dot{position:absolute;right:5px;top:5px;width:4px;height:4px;border-radius:50%;background:var(--red)}
+.tg-slot{
+  grid-column:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:var(--cream);color:var(--muted);
+}
+.tg-slot b{font-family:var(--serif);font-size:11px;color:var(--ink);font-weight:600;line-height:1}
+.tg-slot span{font-size:6.5px;letter-spacing:0;transform:scale(.92)}
+.tg-cell{background:transparent}
+.tg-cell.today{background:rgba(168,58,43,.035)}
+.tg-course,.tg-exam{
+  z-index:2;min-width:0;min-height:0;margin:2px 1px;padding:3px 3px 2px;overflow:hidden;cursor:pointer;
+  background:var(--paper);border-left:2px solid var(--c,var(--red));border-radius:1px;
+  box-shadow:0 1px 0 rgba(58,45,32,.06),0 0 0 1px rgba(58,45,32,.04);
+}
+.tg-exam{background:#fbf1e8;border-left-color:var(--red)}
+.tg-time{display:block;font-style:normal;font-size:7px;line-height:1.1;letter-spacing:0;
+  color:var(--c,var(--red));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px}
+.tg-exam .tg-time{color:var(--red)}
+.tg-course .tg-time{display:block;font-size:6.5px;color:var(--muted);margin-bottom:1px;letter-spacing:0}
+.tg-course b,.tg-exam b{display:-webkit-box;font-size:9.5px;line-height:1.16;font-weight:600;color:var(--ink);
+  overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;word-break:break-all}
+.tg-course small,.tg-exam small{display:block;margin-top:1px;font-size:7px;line-height:1.15;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-exam b{color:var(--red)}
+@media (min-width:520px){
+  .timetable{grid-template-columns:46px repeat(7,minmax(0,1fr));grid-template-rows:50px repeat(12,48px)}
+  .tg-course b,.tg-exam b{font-size:10px}
+  .tg-course small,.tg-exam small{font-size:8px}
+}
+
+
+/* 同一格多门课：纵向堆叠，全部可见 */
+.tg-one,.tg-stack{z-index:2;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;margin:2px 1px;gap:1px}
+.tg-one .tg-course,.tg-one .tg-exam,.tg-stack .tg-course,.tg-stack .tg-exam{flex:1;min-height:0;margin:0;box-shadow:none}
+.tg-stack .tg-course b,.tg-stack .tg-exam b{font-size:8px;line-height:1.1}
+.tg-stack .tg-course small,.tg-stack .tg-exam small{font-size:6.5px}
+.tg-stack .tg-course .tg-time,.tg-stack .tg-exam .tg-time{font-size:6px}
+
+
+/* 顶部只保留品牌/入口；时间与问候移入校园卡 */
+.masthead{padding:10px 18px 8px}
+.topline{padding-bottom:0}
+.brand-name{font-size:15px;letter-spacing:3px}
+.brand-sub{font-size:8px;letter-spacing:2.2px}
+.hero-actions{gap:10px}
+.mailbtn,.morebtn{min-height:34px}
+body.card-mode .masthead{padding:10px 18px 8px}
+
+.cardwelcome{padding:16px 2px 8px}
+.cardwelcome .kicker{font-size:8.5px;letter-spacing:2.2px}
+.cardwelcome h1#greet{font-size:27px;line-height:1.25;margin:6px 0 5px;letter-spacing:1.4px}
+.cardwelcome .who{font-size:9.5px;letter-spacing:1px}
+#panel-card #ledger{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:6px 0 4px;
+  padding:9px 0;background:var(--cream);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+#panel-card #ledger.hidden{display:none}
+#panel-card #ledger .cell{padding:0 9px 0 0}
+#panel-card #ledger .cell:last-child{padding-left:12px}
+#panel-card #ledger .cell b{font-size:20px}
+#panel-card #ledger .cell span{font-size:8px;letter-spacing:1.2px}
+#panel-card #updatedAt{margin:0 0 2px;padding:4px 0 6px;border:0;background:transparent;min-height:0}
+#panel-card .section-head{margin:10px 0 8px}
+
+/* 课表与考试在移除顶部问候后占满并居中 */
+body.roomy-top main{padding-left:10px;padding-right:10px}
+#panel-schedule,#panel-exams{width:100%;max-width:760px;margin:0 auto}
+#panel-schedule .timetable{width:100%;margin-left:auto;margin-right:auto}
+#panel-exams .exam-center{width:100%;max-width:620px;margin:auto;display:flex;flex-direction:column}
+#panel-exams .examlist{width:100%;max-width:620px;margin:0 auto}
+#panel-exams{min-height:calc(100dvh - 150px);display:flex;flex-direction:column}
+
+
+#timeline.swipe-left{animation:swipeLeft .24s ease both}
+#timeline.swipe-right{animation:swipeRight .24s ease both}
+@keyframes swipeLeft{from{opacity:.55;transform:translateX(10px)}to{opacity:1;transform:none}}
+@keyframes swipeRight{from{opacity:.55;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+
+/* 考试页去掉重复操作后，标题和内容居中 */
+#panel-exams .section-head{justify-content:center;text-align:center}
+#panel-exams .section-head h3{width:100%;justify-content:center}
+#panel-exams #examNote{text-align:center;margin-left:auto;margin-right:auto;max-width:560px}
+#panel-exams .examgroup-head{justify-content:center;gap:10px}
+
+
+/* 成绩课程类型与换算分 */
+.g-kind{display:inline-block;font-style:normal;font-family:var(--sans);font-size:7.5px;line-height:1.4;
+  letter-spacing:.5px;padding:1px 4px;margin-left:3px;border:1px solid var(--line);color:var(--muted);
+  vertical-align:1px}
+.g-kind.is-exam{color:var(--red);border-color:rgba(168,58,43,.45)}
+.g-kind.is-check{color:var(--celadon);border-color:rgba(90,120,100,.45)}
+
+
+/* 彩色课程块：整块同色，便于看结束位置；地点居中 */
+.tg-course{
+  background:var(--c,var(--cream));
+  border-left-color:rgba(23,20,17,.28);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+}
+.tg-course .tg-time{width:100%;text-align:center;color:rgba(23,20,17,.72)}
+.tg-course b{width:100%;text-align:center;color:var(--ink)}
+.tg-course small{width:100%;text-align:center;color:rgba(23,20,17,.72)}
+.tg-stack .tg-course{background:var(--c,var(--cream))}
+
+
+#timeline{will-change:transform;touch-action:pan-y}
+#timeline .timetable{touch-action:pan-y}
+
+
+/* 相邻两周并排滑动 */
+#timeline{overflow:hidden}
+.week-track{display:flex;width:200%;will-change:transform}
+.week-page{width:50%;flex:0 0 50%;min-width:0}
+.week-page .timetable{width:100%}
+
+#timeline.week-swiping .tg-course{box-shadow:none}
+.week-page{contain:layout paint;overflow:hidden}

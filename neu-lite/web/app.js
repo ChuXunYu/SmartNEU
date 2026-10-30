@@ -437,10 +437,10 @@ function statsFor(tab) {
 
 function renderStats(tab = state.tab, animate = true) {
   const led = $("#ledger");
-  if (tab === "net" || tab === "card" || tab === "run") { led.classList.add("hidden"); return; }
+  if (tab !== "card") { led.classList.add("hidden"); return; }
   led.classList.remove("hidden");
   const paint = () => {
-    const cells = statsFor(tab);
+    const cells = statsFor("schedule");
     for (let i = 0; i < 3; i++) {
       const c = cells[i] || { v: "—", l: "" };
       $("#st" + (i + 1)).textContent = c.v;
@@ -478,6 +478,7 @@ function examsForDate(date) {
 function renderExamUpNext() {
   const box = $("#examUpNext");
   if (!box) return;
+  if (state.view === "week") { box.classList.add("hidden"); return; }
   const ws = state.weekStart ? ymd(state.weekStart) : "";
   const we = ws ? ymd(new Date(state.weekStart.getTime() + 6 * 86400000)) : "";
   const today = ymd(new Date());
@@ -519,9 +520,7 @@ function renderSchedule(schedule) {
   const start = new Date((schedule.start || ymd(sundayOf(new Date()))) + "T00:00:00");
   state.weekStart = start;
   $("#weekTitle").textContent = schedule.week ? `第 ${schedule.week} 周` : "课程表";
-  const weekExamCount = examItems().filter((e) => e.date >= schedule.start && e.date <= schedule.end).length;
-  $("#weekRange").innerHTML = `${schedule.start?.slice(5)} ~ ${schedule.end?.slice(5)}` +
-    (weekExamCount ? ` <em class="weekexam">考试 ${weekExamCount}</em>` : "");
+  $("#weekRange").textContent = `${schedule.start?.slice(5)} ~ ${schedule.end?.slice(5)}`;
 
   const today = ymd(new Date());
   const days = [];
@@ -553,42 +552,194 @@ function renderSchedule(schedule) {
   renderExamUpNext();
 }
 
-function renderWeek(days) {
-  const events = state.schedule?.events || [];
+const WEEK_ORDER = [0, 1, 2, 3, 4, 5, 6]; // 沿用现有周日为首日，日期与后端周区间一致
+const PERIOD_COUNT = 12;
+const MAX_PERIODS = 14;
+const PERIOD_START = ["08:00", "08:55", "10:00", "10:55", "13:30", "14:25",
+  "15:30", "16:25", "18:30", "19:25", "20:20", "21:15"];
+
+function sectionFromClock(hm) {
+  const m = String(hm || "").match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const t = Number(m[1]) * 60 + Number(m[2]);
+  const pairs = [
+    [1, 2, 0, 9 * 60 + 59],
+    [3, 4, 10 * 60, 11 * 60 + 59],
+    [5, 6, 13 * 60, 15 * 60 + 19],
+    [7, 8, 15 * 60 + 20, 17 * 60 + 19],
+    [9, 10, 18 * 60, 20 * 60 + 19],
+    [11, 12, 20 * 60 + 20, 24 * 60],
+  ];
+  const p = pairs.find((x) => t >= x[2] && t <= x[3]) || pairs[pairs.length - 1];
+  return { start: p[0], end: p[1] };
+}
+
+function sectionBounds(e) {
+  const bs = Number(e.begin_section || 0);
+  const es = Number(e.end_section || 0);
+  if (bs >= 1 && bs <= MAX_PERIODS) {
+    return { start: bs, end: Math.min(MAX_PERIODS, Math.max(bs, es || bs)) };
+  }
+  const m = String(e.sections || "").match(/(\d+)\s*[-–—]\s*(\d+)/);
+  if (m) {
+    const a = Math.max(1, Math.min(MAX_PERIODS, Number(m[1])));
+    const b = Math.max(a, Math.min(MAX_PERIODS, Number(m[2])));
+    return { start: a, end: b };
+  }
+  const startHm = (e.start || "").slice(11, 16) || e.hm;
+  const endHm = (e.end || "").slice(11, 16) || e.endHm;
+  const b = sectionFromClock(startHm) || { start: 1, end: 2 };
+  const en = sectionFromClock(endHm);
+  return { start: b.start, end: Math.max(b.start, en ? en.end : b.end) };
+}
+
+const COURSE_BG = ["#e7a69a", "#edc68b", "#b4d0a6", "#b3c7e6", "#ddb6d0",
+  "#ddc18e", "#a8d0c8", "#efb5a8", "#c7c0e5", "#d4dfa1", "#e5bfa5", "#bad4df"];
+const COURSE_COLOR_MAP = new Map();
+
+function courseColor(e) {
+  const key = String(e.title || "课程");
+  if (COURSE_COLOR_MAP.has(key)) return COURSE_COLOR_MAP.get(key);
+  const color = COURSE_BG[COURSE_COLOR_MAP.size % COURSE_BG.length];
+  COURSE_COLOR_MAP.set(key, color);
+  return color;
+}
+
+function fitTimetable(rows) {
+  const grids = $$("#timeline .timetable");
+  const tab = $(".tabbar");
+  if (!grids.length || !tab || !rows) return;
+  const top = grids[0].getBoundingClientRect().top;
+  const bottom = tab.getBoundingClientRect().top;
+  const available = bottom - top - 6;
+  if (available < 120) return;
+  const header = 42;
+  const height = Math.max(28, Math.min(46, Math.floor((available - header) / rows)));
+  grids.forEach((grid) => { grid.style.gridTemplateRows = `${header}px repeat(${rows}, ${height}px)`; });
+}
+
+function weekHtmlFor(days, schedule) {
+  const events = schedule?.events || [];
   const today = ymd(new Date());
-  const blocks = days.map((d, i) => {
-    const evs = events.filter((e) => (e.start || "").slice(0, 10) === d.date);
-    const exams = examsForDate(d.date);
-    const all = [
-      ...evs.map((e) => ({ kind: "course", start: e.start || "", data: e })),
-      ...exams.map((e) => ({ kind: "exam", start: e.start || "", data: e })),
-    ].sort((a, b) => a.start.localeCompare(b.start));
-    const rows = all.length
-      ? all.map((it) => {
-          if (it.kind === "exam") {
-            const e = it.data;
-            const meta = [e.place, e.seat ? `座位 ${e.seat}` : ""].filter(Boolean).map(esc).join(" · ");
-            return `<div class="wdev wexam"><span class="t">${esc(e.hm || "")}</span><span class="n"><i class="wtag">考</i>${esc(e.title)}</span><span class="m">${meta}</span></div>`;
-          }
-          const e = it.data;
-          const t = (e.start || "").slice(11, 16);
-          const meta = [e.location, e.teacher].filter(Boolean).map(esc).join(" · ");
-          return `<div class="wdev"><span class="t">${t}</span><span class="n">${esc(e.title || "课程")}</span><span class="m">${meta}</span></div>`;
-        }).join("")
-      : `<div class="wdempty">无课</div>`;
-    return `<div class="weekday ${d.date === today ? "today" : ""} ${exams.length ? "has-exam" : ""}">
-      <button class="wdhead" data-i="${i}"><b>${d.label}</b><span>${d.date.slice(5)}</span>${exams.length ? '<i class="wd-exam-dot"></i>' : ""}</button>
-      <div class="wdbody">${rows}</div>
-    </div>`;
-  }).join("");
-  $("#timeline").innerHTML = `<div class="weekview">${blocks}</div>`;
-  $$("#timeline .wdhead").forEach((b) => b.addEventListener("click", () => {
-    state.selectedDay = Number(b.dataset.i);
-    state.view = "day";
-    try { localStorage.setItem("neu.schedule.view", "day"); } catch {}
-    applyViewUI();
-    renderSchedule(state.schedule);
-  }));
+  const weekDays = WEEK_ORDER.map((i) => days[i]);
+  const colOf = new Map(weekDays.map((d, i) => [d.date, i + 2]));
+  const usedEnds = events.map((e) => sectionBounds(e).end);
+  const periodCount = events.length
+    ? Math.min(MAX_PERIODS, Math.max(PERIOD_COUNT, ...usedEnds))
+    : PERIOD_COUNT;
+  // 有真实课程时，行时间完全按接口返回的上课/下课时间；没有课程时才用默认节次时间占位。
+  const defaultTimes = Array.from({ length: periodCount }, (_, i) => PERIOD_START[i] || "");
+  const slotTimes = events.length ? Array(periodCount).fill("") : defaultTimes;
+  // 先放上课时间；同一节有多门课时取最早的上课时间。
+  events.forEach((e) => {
+    const b = sectionBounds(e);
+    const t1 = (e.start || "").slice(11, 16);
+    if (t1 && b.start >= 1 && b.start <= slotTimes.length && (!slotTimes[b.start - 1] || t1 < slotTimes[b.start - 1])) {
+      slotTimes[b.start - 1] = t1;
+    }
+  });
+  // 只有该节没有上课时间的课程时，才用下课时间补空行。
+  events.forEach((e) => {
+    const b = sectionBounds(e);
+    const t2 = (e.end || "").slice(11, 16);
+    if (t2 && b.end >= 1 && b.end <= slotTimes.length && !slotTimes[b.end - 1]) {
+      slotTimes[b.end - 1] = t2;
+    }
+  });
+
+  const head = weekDays.map((d, i) => `
+    <button class="tg-day ${d.date === today ? "today" : ""}"
+      style="grid-column:${i + 2};grid-row:1" data-date="${d.date}" type="button">
+      <b>${d.label}</b><span>${d.date.slice(5).replace("-", ".")}</span>
+    </button>`).join("");
+
+  const slots = Array.from({ length: periodCount }, (_, i) => `
+    <div class="tg-slot" style="grid-column:1;grid-row:${i + 2}">
+      <b>${i + 1}</b><span>${slotTimes[i]}</span>
+    </div>`).join("");
+
+  const cells = weekDays.map((d, i) =>
+    Array.from({ length: periodCount }, (_, r) => `
+      <div class="tg-cell ${d.date === today ? "today" : ""}" style="grid-column:${i + 2};grid-row:${r + 2}"></div>`
+    ).join("")).join("");
+
+  const cards = [];
+  weekDays.forEach((d, di) => {
+    const list = [];
+    events.filter((e) => (e.start || "").slice(0, 10) === d.date).forEach((e) => {
+      const b = sectionBounds(e);
+      const t1 = (e.start || "").slice(11, 16);
+      const t2 = (e.end || "").slice(11, 16);
+      const meta = [e.location, e.teacher].filter(Boolean).join(" · ");
+      list.push({
+        b,
+        html: `<div class="tg-course" style="--c:${courseColor(e)}"
+          data-date="${d.date}" title="${esc(t1 + (t2 ? "–" + t2 : "") + " · " + (e.title || "课程"))}">
+          <i class="tg-time">${esc(t1)}</i>
+          <b>${esc(e.title || "未命名课程")}</b>
+          <small>${esc(meta)}</small>
+        </div>`
+      });
+    });
+    list.sort((a, b) => a.b.start - b.b.start || a.b.end - b.b.end);
+    const clusters = [];
+    list.forEach((it) => {
+      const last = clusters[clusters.length - 1];
+      if (last && it.b.start <= last.end) {
+        last.end = Math.max(last.end, it.b.end);
+        last.items.push(it);
+      } else {
+        clusters.push({ start: it.b.start, end: it.b.end, items: [it] });
+      }
+    });
+    clusters.forEach((g) => {
+      const style = `grid-column:${di + 2};grid-row:${g.start + 1}/${g.end + 2}`;
+      const inner = g.items.map((x) => x.html).join("");
+      cards.push(g.items.length === 1
+        ? `<div class="tg-one" style="${style}">${inner}</div>`
+        : `<div class="tg-stack" style="${style}" title="${g.items.length} 门课程时间重叠">${inner}</div>`);
+    });
+  });
+
+  return {
+    periodCount,
+    html: `<div class="timetable" style="grid-template-rows:46px repeat(${periodCount},44px)">
+      <div class="tg-corner" style="grid-column:1;grid-row:1"><b>节</b><span>时间</span></div>
+      ${head}${slots}${cells}${cards.join("")}
+    </div>`
+  };
+}
+
+function bindWeekCards(root, days) {
+  root.querySelectorAll(".tg-day,.tg-course,.tg-exam").forEach((el) => {
+    el.addEventListener("click", () => {
+      const idx = days.findIndex((d) => d.date === el.dataset.date);
+      if (idx < 0) return;
+      state.selectedDay = idx;
+      state.view = "day";
+      try { localStorage.setItem("neu.schedule.view", "day"); } catch {}
+      applyViewUI();
+      renderSchedule(state.schedule);
+    });
+  });
+}
+
+function daysFromSchedule(schedule) {
+  const start = new Date((schedule.start || ymd(sundayOf(new Date()))) + "T00:00:00");
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start.getTime() + i * 86400000);
+    days.push({ date: ymd(d), label: WEEK_NAMES[d.getDay()], dayNum: d.getDate() });
+  }
+  return days;
+}
+
+function renderWeek(days) {
+  $("#examUpNext").classList.add("hidden");
+  const page = weekHtmlFor(days, state.schedule);
+  $("#timeline").innerHTML = page.html;
+  bindWeekCards($("#timeline"), days);
+  requestAnimationFrame(() => fitTimetable(page.periodCount));
 }
 
 function applyViewUI() {
@@ -778,6 +929,157 @@ $("#prevWeek").addEventListener("click", () => loadWeek(-1));
 $("#nextWeek").addEventListener("click", () => loadWeek(1));
 $("#btnThisWeek").addEventListener("click", goThisWeek);
 
+/* 周课表跟手横向滑动：当前周和相邻周并排，松手吸附 */
+(() => {
+  const panel = $("#panel-schedule");
+  const timeline = $("#timeline");
+  if (!panel || !timeline) return;
+  let drag = null;
+  let lastTouch = 0;
+  let blockClickUntil = 0;
+  let snapTimer = 0;
+
+  const allowed = (target) => !(target && target.closest &&
+    target.closest("button,a,input,textarea,select,.sheet,.tabbar"));
+  const viewWidth = () => timeline.clientWidth || panel.clientWidth || 360;
+
+  const begin = (x, y) => {
+    if (state.view !== "week" || weekBusy) return;
+    clearTimeout(snapTimer);
+    drag = { x, y, horiz: false, track: null, width: 0 };
+  };
+
+  const buildTrack = (dir) => {
+    if (drag.adj) return true;
+    const anchor = new Date((state.weekStart || sundayOf(new Date())).getTime() + dir * 7 * 86400000);
+    const adjacent = computeWeek(anchor);
+    if (!adjacent) return false;
+    const days = daysFromSchedule(adjacent);
+    const currentGrid = timeline.firstElementChild;
+    if (!currentGrid) return false;
+    const adjacentHtml = weekHtmlFor(days, adjacent).html;
+    const currentPage = document.createElement("div");
+    currentPage.className = "week-page";
+    currentPage.appendChild(currentGrid); // 保留当前节点，避免触摸目标被销毁
+    const adjacentPage = document.createElement("div");
+    adjacentPage.className = "week-page";
+    adjacentPage.innerHTML = adjacentHtml;
+    const track = document.createElement("div");
+    track.className = "week-track";
+    if (dir > 0) track.append(currentPage, adjacentPage);
+    else track.append(adjacentPage, currentPage);
+    timeline.replaceChildren(track);
+    timeline.classList.add("week-swiping");
+    drag.track = track;
+    drag.adj = adjacent;
+    drag.dir = dir;
+    drag.currentGrid = currentGrid;
+    drag.width = viewWidth();
+    drag.base = dir > 0 ? 0 : -drag.width;
+    track.style.transform = `translate3d(${drag.base}px,0,0)`;
+    requestAnimationFrame(() => fitTimetable(12));
+    return true;
+  };
+
+  const move = (x, y, ev) => {
+    if (!drag) return;
+    const dx = x - drag.x;
+    const dy = y - drag.y;
+    if (!drag.horiz) {
+      if (Math.abs(dx) < 8) return;
+      if (Math.abs(dx) <= Math.abs(dy) * 1.2) { drag = null; return; }
+      if (!buildTrack(dx < 0 ? 1 : -1)) { drag = null; return; }
+      drag.horiz = true;
+    }
+    if (ev && ev.cancelable) ev.preventDefault();
+    const max = drag.width || viewWidth();
+    const offset = Math.max(-max, Math.min(max, dx));
+    drag.track.style.transform = `translate3d(${drag.base + offset}px,0,0)`;
+  };
+
+  const restoreCurrent = (grid) => {
+    if (grid) timeline.replaceChildren(grid);
+    timeline.classList.remove("week-swiping");
+    timeline.style.transform = "";
+    requestAnimationFrame(() => fitTimetable(12));
+  };
+
+  const finish = (x) => {
+    if (!drag) return;
+    const d = drag;
+    const dx = x - d.x;
+    const horiz = d.horiz;
+    drag = null;
+    if (!horiz || !d.track) return;
+    blockClickUntil = Date.now() + 520;
+    const width = d.width || viewWidth();
+    const threshold = Math.max(56, width * 0.22);
+    const go = d.dir > 0 ? dx < -threshold : dx > threshold;
+    const target = go ? (d.dir > 0 ? -width : 0) : d.base;
+    d.track.style.transition = "transform .22s cubic-bezier(.22,.61,.36,1)";
+    d.track.style.transform = `translate3d(${target}px,0,0)`;
+    snapTimer = setTimeout(() => {
+      if (go) {
+        timeline.classList.remove("week-swiping");
+        state.schedule = d.adj;
+        state.weekStart = new Date(d.adj.start + "T00:00:00");
+        state.selectedDay = null;
+        renderSchedule(d.adj);
+      } else {
+        restoreCurrent(d.currentGrid);
+      }
+      timeline.style.transition = "";
+    }, 220);
+  };
+
+  panel.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    lastTouch = Date.now();
+    if (!allowed(e.target)) return;
+    begin(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+
+  panel.addEventListener("touchmove", (e) => {
+    if (!drag || e.touches.length !== 1) return;
+    move(e.touches[0].clientX, e.touches[0].clientY, e);
+  }, { passive: false });
+
+  panel.addEventListener("touchend", (e) => {
+    const t = e.changedTouches[0];
+    if (!t) return;
+    lastTouch = Date.now();
+    finish(t.clientX);
+  }, { passive: true });
+
+  panel.addEventListener("touchcancel", () => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (d.track) d.track.style.transform = `translate3d(${d.base}px,0,0)`;
+    setTimeout(() => restoreCurrent(d.currentGrid), 220);
+  });
+
+  panel.addEventListener("mousedown", (e) => {
+    if (Date.now() - lastTouch < 800 || e.button !== 0 || !allowed(e.target)) return;
+    begin(e.clientX, e.clientY);
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (Date.now() - lastTouch < 800) return;
+    move(e.clientX, e.clientY, e);
+  });
+  window.addEventListener("mouseup", (e) => {
+    if (Date.now() - lastTouch < 800) return;
+    finish(e.clientX);
+  });
+
+  panel.addEventListener("click", (e) => {
+    if (Date.now() < blockClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+})();
+
 /* ---------------- 考试 ---------------- */
 function examParts(x) {
   const t = String(x.time || "");
@@ -879,29 +1181,25 @@ function renderExams(exams) {
   box.innerHTML = html;
 }
 
-async function probeJwxt() {
-  toast("正在检查教务…");
-  try {
-    const j = await api("/api/jwxt?probe=1");
-    toast(j.status === "ok" ? `教务已连接：考试 ${j.exams ?? 0} · 成绩 ${j.grades ?? 0}` : (j.note || "教务未连接"));
-    await refresh();
-  } catch (e) { toast(e.message); }
-}
-
 /* ---------------- 成绩 ---------------- */
-const GRADE_BANDS = [
-  { key: "b90", label: "90+", test: (n) => n >= 90 },
-  { key: "b80", label: "80–89", test: (n) => n >= 80 && n < 90 },
-  { key: "b70", label: "70–79", test: (n) => n >= 70 && n < 80 },
-  { key: "b60", label: "60–69", test: (n) => n >= 60 && n < 70 },
-  { key: "b0", label: "<60", test: (n) => n < 60 },
-];
-
 function rankText(value) {
   const s = String(value || "").trim();
   if (!s) return "—";
   if (s.includes("/")) return s.split("/").map((x) => x.trim()).filter(Boolean).join(" / ");
   return `第 ${s} 名`;
+}
+
+function gradeKind(x) {
+  const raw = [x.exam_type, x.assess_type, x.type].filter(Boolean).join(" ");
+  if (/考查/.test(raw)) return "考查课";
+  if (/考试/.test(raw)) return "考试课";
+  return "";
+}
+
+function convertedGrade(raw) {
+  const s = String(raw ?? "").trim();
+  if (!/^[-+]?\d+(?:\.\d+)?$/.test(s)) return s || "—";
+  return (Number(s) / 10 - 5).toFixed(1);
 }
 
 function renderGrades(grades) {
@@ -911,19 +1209,8 @@ function renderGrades(grades) {
   const r = grades.rank || {};
   const items = grades.items || [];
   const gpa = parseFloat(r.gpa);
-  const scores = items.map((x) => parseFloat(x.score)).filter((n) => !isNaN(n));
-  const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   const major = rankText(r.major_rank || r.rank);
   const overall = r.rank && r.rank !== r.major_rank ? rankText(r.rank) : "";
-  const counts = GRADE_BANDS.map((b) => scores.filter((n) => b.test(n)).length);
-  const hasDist = scores.length > 0;
-  const dist = hasDist ? `<div class="grade-dist">
-    <div class="dist-head"><span>成绩分布</span><span>${scores.length} 门计分</span></div>
-    <div class="dist-bar">${GRADE_BANDS.map((b, i) => counts[i]
-      ? `<i class="${b.key}" style="flex:${counts[i]}" title="${b.label} · ${counts[i]} 门"></i>` : "").join("")}</div>
-    <div class="dist-legend">${GRADE_BANDS.map((b, i) =>
-      `<span><i class="${b.key}"></i>${b.label} <b>${counts[i]}</b></span>`).join("")}</div>
-  </div>` : "";
 
   hero.innerHTML = `<div class="gpahero">
     <div class="gpa-num"><b>${isNaN(gpa) ? "—" : gpa.toFixed(2)}</b><span>平均绩点 GPA</span></div>
@@ -931,47 +1218,38 @@ function renderGrades(grades) {
       <h4>${r.major_rank ? "专业排名" : "排名"}</h4>
       <div class="rank">${major}</div>
       ${overall ? `<div class="rank-sub">年级 ${overall}</div>` : ""}
-      ${avg != null ? `<div class="chips"><span>平均分 ${avg.toFixed(1)}</span></div>` : ""}
     </div>
-  </div>${dist}${hasDist ? `<div class="grade-filters" id="gradeFilters">
-    <button class="grade-filter on" data-band="all" type="button">全部 <i>${items.length}</i></button>
-    ${GRADE_BANDS.map((b, i) => counts[i]
-      ? `<button class="grade-filter" data-band="${b.key}" type="button">${b.label} <i>${counts[i]}</i></button>` : "").join("")}
-  </div>` : ""}`;
+  </div>`;
 
   $("#gradeCount").textContent = `${items.length} 门`;
   if (!items.length) { list.innerHTML = `<div class="empty">暂无成绩</div>`; return; }
 
   const row = (x) => {
-    const s = String(x.score ?? "");
-    const num = parseFloat(s);
+    const raw = String(x.score ?? "").trim();
+    const num = parseFloat(raw);
+    const numeric = /^[-+]?\d+(?:\.\d+)?$/.test(raw);
     let cls = "txt";
-    if (!isNaN(num)) cls = num >= 90 ? "s90" : num >= 80 ? "s80" : num >= 60 ? "s60" : "s0";
-    const meta = [x.term, x.type, x.credit ? `${x.credit} 学分` : ""]
-      .filter(Boolean).map(esc).join(" · ");
-    const pct = !isNaN(num) ? Math.max(0, Math.min(100, num)) : null;
+    if (numeric && !isNaN(num)) cls = num >= 90 ? "s90" : num >= 80 ? "s80" : num >= 60 ? "s60" : "s0";
+    const kind = gradeKind(x);
+    const type = String(x.type || "");
+    const metaParts = [
+      x.term,
+      type && !/考查|考试/.test(type) ? type : "",
+      x.credit ? `${x.credit} 学分` : "",
+    ].filter(Boolean);
+    const meta = metaParts.map(esc).join(" · ");
+    const pct = numeric && !isNaN(num) ? Math.max(0, Math.min(100, num)) : null;
     return `<div class="grade">
-      <div class="g-name"><b>${esc(x.course)}</b><span>${meta}</span></div>
-      <div class="score ${cls}">${esc(s || "—")}</div>
+      <div class="g-name">
+        <b>${esc(x.course || "")}</b>
+        <span>${meta}${kind ? ` <i class="g-kind ${kind === "考试课" ? "is-exam" : "is-check"}">${kind}</i>` : ""}</span>
+      </div>
+      <div class="score ${cls}" title="原始成绩 ${esc(raw || "—")}">${esc(convertedGrade(raw))}</div>
       ${pct != null ? `<div class="g-bar"><i style="width:${pct}%"></i></div>` : ""}
     </div>`;
   };
 
-  let band = state.gradeBand && GRADE_BANDS.some((b) => b.key === state.gradeBand) ? state.gradeBand : "all";
-  const paint = (key) => {
-    band = key;
-    state.gradeBand = key;
-    const filtered = key === "all" ? items : items.filter((x) => {
-      const n = parseFloat(x.score);
-      const def = GRADE_BANDS.find((b) => b.key === key);
-      return !isNaN(n) && def && def.test(n);
-    });
-    list.innerHTML = filtered.length ? filtered.map(row).join("") : `<div class="empty">没有符合的成绩</div>`;
-    $$("#gradeFilters .grade-filter").forEach((b) => b.classList.toggle("on", b.dataset.band === key));
-    $("#gradeCount").textContent = key === "all" ? `${items.length} 门` : `${filtered.length} / ${items.length} 门`;
-  };
-  $$("#gradeFilters .grade-filter").forEach((b) => b.addEventListener("click", () => paint(b.dataset.band)));
-  paint(band);
+  list.innerHTML = items.map(row).join("");
 }
 
 /* ---------------- 网费 ---------------- */
@@ -1398,7 +1676,6 @@ function exportPlainCsvAll() {
 }
 
 $("#btnExportKb").addEventListener("click", () => encryptedExport("timetable"));
-$("#btnExportExams").addEventListener("click", () => encryptedExport("exams"));
 $("#btnExport").addEventListener("click", () => { closeSheet(); encryptedExport("state"); });
 $("#btnImport").addEventListener("click", async () => {
   closeSheet();
@@ -1419,16 +1696,6 @@ if (window.NEU) {
   });
 }
 $("#btnRefresh").addEventListener("click", () => { closeSheet(); refresh(); });
-$("#probeJwxt").addEventListener("click", probeJwxt);
-
-function exportCsv(kind) {
-  if (window.NEU) {
-    const r = String(window.NEU.exportCsv(kind) || "");
-    toast(r.startsWith("ERR") ? r : "已导出：" + r);
-    return;
-  }
-  location.href = kind === "exams" ? "/api/export/exams.csv" : "/api/export/timetable.csv";
-}
 
 /* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
 function openUrlSafe(url, title = "邮箱") {

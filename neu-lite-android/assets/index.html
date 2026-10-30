@@ -78,18 +78,6 @@
       </div>
     </div>
 
-    <div class="hello">
-      <div id="todayLabel" class="kicker">二〇二六年 十月</div>
-      <h1 id="greet">你好</h1>
-      <div id="who" class="who"></div>
-    </div>
-
-    <div class="ledger" id="ledger">
-      <div class="cell"><b id="st1">—</b><span id="sl1">本周课程</span></div>
-      <div class="cell"><b id="st2">—</b><span id="sl2">今日课程</span></div>
-      <div class="cell"><b id="st3">—</b><span id="sl3">有课天数</span></div>
-    </div>
-    <div id="updatedAt" class="updated"></div>
   </header>
 
   <main>
@@ -126,13 +114,11 @@
     <section id="panel-exams" class="panel hidden">
       <div class="section-head">
         <h3><i>02</i>考试</h3>
-        <div class="actions">
-          <button id="btnExportExams" class="textbtn">导出 CSV</button>
-          <button id="probeJwxt" class="textbtn">刷新</button>
-        </div>
       </div>
-      <p id="examNote" class="sub note"></p>
-      <div id="examList" class="examlist"></div>
+      <div class="exam-center">
+        <p id="examNote" class="sub note"></p>
+        <div id="examList" class="examlist"></div>
+      </div>
     </section>
 
     <!-- 成绩 -->
@@ -158,6 +144,17 @@
 
     <!-- 校园卡 -->
     <section id="panel-card" class="panel hidden">
+      <div class="cardwelcome">
+        <div id="todayLabel" class="kicker">二〇二六年 十月</div>
+        <h1 id="greet">你好</h1>
+        <div id="who" class="who"></div>
+      </div>
+      <div id="ledger" class="ledger hidden">
+        <div class="cell"><b id="st1">—</b><span id="sl1">今日课程</span></div>
+        <div class="cell"><b id="st2">—</b><span id="sl2">本周考试</span></div>
+        <div class="cell"><b id="st3">—</b><span id="sl3">距下考</span></div>
+      </div>
+      <div id="updatedAt" class="updated"></div>
       <div class="section-head">
         <h3><i>03</i>校园卡</h3>
         <span id="cardStatus" class="sub"></span>
