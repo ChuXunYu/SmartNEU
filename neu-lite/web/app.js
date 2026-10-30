@@ -1568,98 +1568,31 @@ function getCampusRunUrl() {
   try { return localStorage.getItem("neu.run.url") || ""; } catch { return ""; }
 }
 
-function saveCampusRunUrl(url) {
-  try {
-    if (window.NEU && window.NEU.call) {
-      window.NEU.call("saveCampusRunUrl", JSON.stringify({ url }));
-      return;
-    }
-  } catch {}
-  try { localStorage.setItem("neu.run.url", url); } catch {}
+function directRunUrl(url) {
+  // 乐跑 H5 首页和跑步页共用 token/sign，只替换 hash 路由。
+  if (!url || !url.includes("#/pages/index/index")) return url;
+  return url.replace("#/pages/index/index", "#/pages/run/index");
 }
 
-function clearCampusRunUrl() {
-  try {
-    if (window.NEU && window.NEU.call) {
-      window.NEU.call("clearCampusRunUrl", "{}");
-      return;
-    }
-  } catch {}
-  try { localStorage.removeItem("neu.run.url"); } catch {}
-}
-
-function updateRunPanel() {
-  const el = $("#runTabState");
-  if (!el) return;
-  const url = getCampusRunUrl();
-  el.textContent = url ? "已绑定，可直接打开；链接失效时点「从门户绑定 / 更换」。" : "尚未绑定；登录后会自动后台绑定，也可点「更换」重试。";
-}
-
-function showRunSheet() {
-  closeSheet();
-  $("#runUrl").value = getCampusRunUrl();
-  $("#runMsg").textContent = "";
-  $("#runMask").classList.remove("hidden");
-  setTimeout(() => $("#runUrl").focus(), 80);
+let runBindAt = 0;
+function ensureRunBind() {
+  if (!(window.NEU && window.NEU.call)) return;
+  if (Date.now() - runBindAt < 8000) return;
+  runBindAt = Date.now();
+  try { window.NEU.call("autoBindRun", "{}"); } catch {}
 }
 
 function openCampusRun() {
   const url = getCampusRunUrl();
-  if (!url) { showRunSheet(); return; }
-  openUrlSafe(url, "校园乐跑");
-}
-
-function closeRunSheet() {
-  $("#runMask").classList.add("hidden");
+  if (!url) {
+    ensureRunBind();
+    toast("正在准备校园乐跑，请稍后再试");
+    return;
+  }
+  openUrlSafe(directRunUrl(url), "校园乐跑");
 }
 
 $("#btnRunOpenTab").addEventListener("click", openCampusRun);
-$("#btnRunBindTab").addEventListener("click", showRunSheet);
-window.addEventListener("focus", updateRunPanel);
-
-function startRunAutoBind() {
-  closeRunSheet();
-  if (!(window.NEU && window.NEU.call)) {
-    openSsoSafe("https://personal.neu.edu.cn/portal", "自动绑定校园乐跑", true);
-    return;
-  }
-  window.NEU.call("autoBindRun", "{}");
-  $("#runTabState").textContent = "正在后台绑定校园乐跑…";
-  toast("正在后台绑定校园乐跑…");
-  clearInterval(window.__runBindTimer);
-  let tries = 0;
-  window.__runBindTimer = setInterval(() => {
-    tries++;
-    if (getCampusRunUrl()) {
-      clearInterval(window.__runBindTimer);
-      updateRunPanel();
-      toast("校园乐跑已绑定");
-    } else if (tries > 30) {
-      clearInterval(window.__runBindTimer);
-      updateRunPanel();
-      toast("自动绑定超时，可重试或粘贴链接");
-    }
-  }, 1000);
-}
-
-$("#runPortal").addEventListener("click", startRunAutoBind);
-$("#runOpen").addEventListener("click", () => {
-  const url = $("#runUrl").value.trim().replace(/\s+/g, "");
-  if (!/^https:\/\/tybzhtypt\.neu\.edu\.cn\//.test(url)) {
-    $("#runMsg").textContent = "请粘贴学校官方校园乐跑链接";
-    return;
-  }
-  saveCampusRunUrl(url);
-  closeRunSheet();
-  openUrlSafe(url, "校园乐跑");
-});
-$("#runClear").addEventListener("click", () => {
-  clearCampusRunUrl();
-  $("#runUrl").value = "";
-  $("#runMsg").textContent = "已清除本机链接";
-});
-$("#runCancel").addEventListener("click", closeRunSheet);
-$("#runMask").addEventListener("click", (e) => { if (e.target === $("#runMask")) closeRunSheet(); });
 
 /* ---------------- 导出 / 状态 ---------------- */
 let passResolve = null;
@@ -1743,15 +1676,6 @@ function openUrlSafe(url, title = "邮箱") {
     else window.NEU.openUrl(url);
   } else {
     window.open(url, "_blank", "noopener");
-  }
-}
-
-function openSsoSafe(url, title = "网页", autoBind = false) {
-  if (!url) return;
-  if (window.NEU && window.NEU.call) {
-    window.NEU.call("openSsoWeb", JSON.stringify({ url, title, autoBind }));
-  } else {
-    openUrlSafe(url, title);
   }
 }
 
@@ -2528,7 +2452,6 @@ function activateTab(name) {
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
   renderStats(name, true);
-  if (name === "run") updateRunPanel();
   if (name === "card") loadCard();
   else stopQr();
   window.scrollTo(0, 0);
