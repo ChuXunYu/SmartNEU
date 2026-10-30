@@ -207,16 +207,6 @@ public class MainActivity extends Activity {
         return RunUrl.refresh(SecretStore.getRunUrl(this));
     }
 
-    public void saveCampusRunUrl(String url) {
-        try {
-            SecretStore.saveRunUrl(this, url);
-        } catch (Exception ignored) {}
-    }
-
-    public void clearCampusRunUrl() {
-        SecretStore.clearRunUrl(this);
-    }
-
     public String getMailPassword() {
         return SecretStore.get(this);
     }
@@ -496,15 +486,10 @@ public class MainActivity extends Activity {
     }
 
     public void openWeb(String url, String title, List<String[]> cookies) {
-        openWeb(url, title, cookies, false);
-    }
-
-    public void openWeb(String url, String title, List<String[]> cookies, boolean autoBind) {
         if (url == null || url.isEmpty()) return;
         Intent i = new Intent(this, PaymentActivity.class);
         i.putExtra("url", url);
         i.putExtra("title", title == null ? "网页" : title);
-        i.putExtra("autoBind", autoBind);
         ArrayList<String> lines = new ArrayList<>();
         if (cookies != null) {
             for (String[] c : cookies) {
@@ -515,18 +500,6 @@ public class MainActivity extends Activity {
         }
         i.putStringArrayListExtra("cookies", lines);
         runOnUiThread(() -> startActivity(i));
-    }
-
-    /** 先换 CAS ticket，再在应用内打开，避免门户跳到扫码登录页。 */
-    public void openSsoWeb(String target, String title, boolean autoBind) {
-        if (target == null || target.isEmpty()) return;
-        if (!target.startsWith("https://")) { openWeb(target, title, api.webViewCookies(), autoBind); return; }
-        runOnUiThread(() -> Toast.makeText(this, "正在获取免登票据…", Toast.LENGTH_SHORT).show());
-        new Thread(() -> {
-            String resolved = api.ssoUrl(target);
-            final String url = (resolved == null || resolved.isEmpty()) ? target : resolved;
-            openWeb(url, title, api.webViewCookies(), autoBind);
-        }).start();
     }
 
     public void openSso(String target) {
