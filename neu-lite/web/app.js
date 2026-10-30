@@ -40,7 +40,12 @@ async function httpApi(path, opts = {}) {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
   const j = await r.json().catch(() => ({}));
   if (!r.ok && !j.error) throw new Error(`HTTP ${r.status}`);
-  if (j.error) throw new Error(j.error);
+  if (j.error) {
+    const err = new Error(j.error);
+    const m = /e=(\d+)/.exec(j.error);
+    if (m) err.code = Number(m[1]);
+    throw err;
+  }
   return j;
 }
 function nativeCall(action, payload) {
