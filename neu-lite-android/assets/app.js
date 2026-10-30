@@ -1071,19 +1071,24 @@ function renderExams(exams) {
 }
 
 /* ---------------- 成绩 ---------------- */
-const GRADE_BANDS = [
-  { key: "b90", label: "90+", test: (n) => n >= 90 },
-  { key: "b80", label: "80–89", test: (n) => n >= 80 && n < 90 },
-  { key: "b70", label: "70–79", test: (n) => n >= 70 && n < 80 },
-  { key: "b60", label: "60–69", test: (n) => n >= 60 && n < 70 },
-  { key: "b0", label: "<60", test: (n) => n < 60 },
-];
-
 function rankText(value) {
   const s = String(value || "").trim();
   if (!s) return "—";
   if (s.includes("/")) return s.split("/").map((x) => x.trim()).filter(Boolean).join(" / ");
   return `第 ${s} 名`;
+}
+
+function gradeKind(x) {
+  const raw = [x.exam_type, x.assess_type, x.type].filter(Boolean).join(" ");
+  if (/考查/.test(raw)) return "考查课";
+  if (/考试/.test(raw)) return "考试课";
+  return "";
+}
+
+function convertedGrade(raw) {
+  const s = String(raw ?? "").trim();
+  if (!/^[-+]?\d+(?:\.\d+)?$/.test(s)) return s || "—";
+  return (Number(s) / 10 - 5).toFixed(1);
 }
 
 function renderGrades(grades) {
@@ -1093,19 +1098,8 @@ function renderGrades(grades) {
   const r = grades.rank || {};
   const items = grades.items || [];
   const gpa = parseFloat(r.gpa);
-  const scores = items.map((x) => parseFloat(x.score)).filter((n) => !isNaN(n));
-  const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   const major = rankText(r.major_rank || r.rank);
   const overall = r.rank && r.rank !== r.major_rank ? rankText(r.rank) : "";
-  const counts = GRADE_BANDS.map((b) => scores.filter((n) => b.test(n)).length);
-  const hasDist = scores.length > 0;
-  const dist = hasDist ? `<div class="grade-dist">
-    <div class="dist-head"><span>成绩分布</span><span>${scores.length} 门计分</span></div>
-    <div class="dist-bar">${GRADE_BANDS.map((b, i) => counts[i]
-      ? `<i class="${b.key}" style="flex:${counts[i]}" title="${b.label} · ${counts[i]} 门"></i>` : "").join("")}</div>
-    <div class="dist-legend">${GRADE_BANDS.map((b, i) =>
-      `<span><i class="${b.key}"></i>${b.label} <b>${counts[i]}</b></span>`).join("")}</div>
-  </div>` : "";
 
   hero.innerHTML = `<div class="gpahero">
     <div class="gpa-num"><b>${isNaN(gpa) ? "—" : gpa.toFixed(2)}</b><span>平均绩点 GPA</span></div>
@@ -1113,47 +1107,38 @@ function renderGrades(grades) {
       <h4>${r.major_rank ? "专业排名" : "排名"}</h4>
       <div class="rank">${major}</div>
       ${overall ? `<div class="rank-sub">年级 ${overall}</div>` : ""}
-      ${avg != null ? `<div class="chips"><span>平均分 ${avg.toFixed(1)}</span></div>` : ""}
     </div>
-  </div>${dist}${hasDist ? `<div class="grade-filters" id="gradeFilters">
-    <button class="grade-filter on" data-band="all" type="button">全部 <i>${items.length}</i></button>
-    ${GRADE_BANDS.map((b, i) => counts[i]
-      ? `<button class="grade-filter" data-band="${b.key}" type="button">${b.label} <i>${counts[i]}</i></button>` : "").join("")}
-  </div>` : ""}`;
+  </div>`;
 
   $("#gradeCount").textContent = `${items.length} 门`;
   if (!items.length) { list.innerHTML = `<div class="empty">暂无成绩</div>`; return; }
 
   const row = (x) => {
-    const s = String(x.score ?? "");
-    const num = parseFloat(s);
+    const raw = String(x.score ?? "").trim();
+    const num = parseFloat(raw);
+    const numeric = /^[-+]?\d+(?:\.\d+)?$/.test(raw);
     let cls = "txt";
-    if (!isNaN(num)) cls = num >= 90 ? "s90" : num >= 80 ? "s80" : num >= 60 ? "s60" : "s0";
-    const meta = [x.term, x.type, x.credit ? `${x.credit} 学分` : ""]
-      .filter(Boolean).map(esc).join(" · ");
-    const pct = !isNaN(num) ? Math.max(0, Math.min(100, num)) : null;
+    if (numeric && !isNaN(num)) cls = num >= 90 ? "s90" : num >= 80 ? "s80" : num >= 60 ? "s60" : "s0";
+    const kind = gradeKind(x);
+    const type = String(x.type || "");
+    const metaParts = [
+      x.term,
+      type && !/考查|考试/.test(type) ? type : "",
+      x.credit ? `${x.credit} 学分` : "",
+    ].filter(Boolean);
+    const meta = metaParts.map(esc).join(" · ");
+    const pct = numeric && !isNaN(num) ? Math.max(0, Math.min(100, num)) : null;
     return `<div class="grade">
-      <div class="g-name"><b>${esc(x.course)}</b><span>${meta}</span></div>
-      <div class="score ${cls}">${esc(s || "—")}</div>
+      <div class="g-name">
+        <b>${esc(x.course || "")}</b>
+        <span>${meta}${kind ? ` <i class="g-kind ${kind === "考试课" ? "is-exam" : "is-check"}">${kind}</i>` : ""}</span>
+      </div>
+      <div class="score ${cls}" title="原始成绩 ${esc(raw || "—")}">${esc(convertedGrade(raw))}</div>
       ${pct != null ? `<div class="g-bar"><i style="width:${pct}%"></i></div>` : ""}
     </div>`;
   };
 
-  let band = state.gradeBand && GRADE_BANDS.some((b) => b.key === state.gradeBand) ? state.gradeBand : "all";
-  const paint = (key) => {
-    band = key;
-    state.gradeBand = key;
-    const filtered = key === "all" ? items : items.filter((x) => {
-      const n = parseFloat(x.score);
-      const def = GRADE_BANDS.find((b) => b.key === key);
-      return !isNaN(n) && def && def.test(n);
-    });
-    list.innerHTML = filtered.length ? filtered.map(row).join("") : `<div class="empty">没有符合的成绩</div>`;
-    $$("#gradeFilters .grade-filter").forEach((b) => b.classList.toggle("on", b.dataset.band === key));
-    $("#gradeCount").textContent = key === "all" ? `${items.length} 门` : `${filtered.length} / ${items.length} 门`;
-  };
-  $$("#gradeFilters .grade-filter").forEach((b) => b.addEventListener("click", () => paint(b.dataset.band)));
-  paint(band);
+  list.innerHTML = items.map(row).join("");
 }
 
 /* ---------------- 网费 ---------------- */

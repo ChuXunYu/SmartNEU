@@ -289,6 +289,8 @@ class Jwxt:
                 "gpa": str(row.get("JD") if row.get("JD") is not None else ""),
                 "term": row.get("XNXQDM_DISPLAY") or row.get("XNXQDM") or "",
                 "type": row.get("KCXZDM_DISPLAY") or "",
+                "exam_type": (row.get("KSLXDM_DISPLAY") or row.get("KSFSDM_DISPLAY")
+                              or row.get("KHFSDM_DISPLAY") or ""),
                 "passed": row.get("SFJG_DISPLAY") or "",
             })
         rank = {}

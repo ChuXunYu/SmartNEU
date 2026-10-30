@@ -1119,3 +1119,11 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 #panel-exams .section-head h3{width:100%;justify-content:center}
 #panel-exams #examNote{text-align:center;margin-left:auto;margin-right:auto;max-width:560px}
 #panel-exams .examgroup-head{justify-content:center;gap:10px}
+
+
+/* 成绩课程类型与换算分 */
+.g-kind{display:inline-block;font-style:normal;font-family:var(--sans);font-size:7.5px;line-height:1.4;
+  letter-spacing:.5px;padding:1px 4px;margin-left:3px;border:1px solid var(--line);color:var(--muted);
+  vertical-align:1px}
+.g-kind.is-exam{color:var(--red);border-color:rgba(168,58,43,.45)}
+.g-kind.is-check{color:var(--celadon);border-color:rgba(90,120,100,.45)}

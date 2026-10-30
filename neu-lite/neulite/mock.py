@@ -33,9 +33,12 @@ def overview() -> dict:
                   ]},
         "grades": {"status": "ok", "note": "演示数据", "rank": {"gpa": 3.72, "rank": "12/186", "major_rank": "8/57"},
                    "items": [
-                       {"course": "高等数学 A", "score": "92", "credit": "6.0", "gpa": "4.2"},
-                       {"course": "大学物理", "score": "88", "credit": "5.0", "gpa": "3.8"},
-                       {"course": "程序设计基础", "score": "95", "credit": "3.0", "gpa": "4.5"},
+                       {"course": "高等数学 A", "score": "92", "credit": "6.0", "gpa": "4.2",
+                        "type": "必修", "exam_type": "考试课"},
+                       {"course": "大学物理", "score": "88", "credit": "5.0", "gpa": "3.8",
+                        "type": "必修", "exam_type": "考查课"},
+                       {"course": "程序设计基础", "score": "95", "credit": "3.0", "gpa": "4.5",
+                        "type": "必修", "exam_type": "考试课"},
                    ]},
         "net": {"status": "ok", "note": "演示数据",
                 "cards": [
