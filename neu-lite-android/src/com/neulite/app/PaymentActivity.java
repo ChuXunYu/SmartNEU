@@ -36,10 +36,6 @@ public class PaymentActivity extends Activity {
     private PermissionRequest pendingPermission;
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
-    private boolean runCaptured;
-    private boolean autoBind;
-    private int autoStep;
-    private int autoTries;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -49,7 +45,6 @@ public class PaymentActivity extends Activity {
         String pageTitle = getIntent().getStringExtra("title");
         if (pageTitle == null || pageTitle.isEmpty()) pageTitle = "缴费";
         ArrayList<String> cookies = getIntent().getStringArrayListExtra("cookies");
-        autoBind = getIntent().getBooleanExtra("autoBind", false);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -121,21 +116,17 @@ public class PaymentActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String u = request.getUrl().toString();
-                captureRunUrl(u);
                 return handle(u);
             }
 
             @Override
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                captureRunUrl(url);
                 return handle(url);
             }
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                captureRunUrl(url);
-                maybeAutoBind(url);
                 super.onPageStarted(view, url, favicon);
             }
         });
@@ -143,9 +134,6 @@ public class PaymentActivity extends Activity {
             @Override
             public void onReceivedTitle(WebView view, String title) {
                 super.onReceivedTitle(view, title);
-                // H5 常用 hash 路由，onPageStarted 不一定会再次触发；标题变化时补一次捕获。
-                captureRunUrl(view.getUrl());
-                maybeAutoBind(view.getUrl());
                 android.util.Log.d("NeuPay", "title=" + title + " url=" + view.getUrl());
             }
 
@@ -202,61 +190,6 @@ public class PaymentActivity extends Activity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         if (url != null && !url.isEmpty()) web.loadUrl(url);
-    }
-
-    private static final String PORTAL = "https://personal.neu.edu.cn/portal";
-    private static final String APP_CENTER = "https://personal.neu.edu.cn/portal/pages/appmarketsite/site/application/m_home";
-
-    /** 自动走：一号通首页 -> 应用中心 -> 校园乐跑；用户不需要手动点。 */
-    private void maybeAutoBind(String url) {
-        if (!autoBind || url == null || runCaptured) return;
-        if (url.contains("tybzhtypt.neu.edu.cn")) return;
-        if (url.contains("cas_login") || url.contains("/tpass/")) return;
-        if (autoStep == 0 && url.contains("personal.neu.edu.cn/portal")) {
-            autoStep = 1;
-            web.postDelayed(() -> {
-                if (!isFinishing()) web.loadUrl(APP_CENTER);
-            }, 700);
-            return;
-        }
-        if (autoStep == 1 && url.contains("appmarketsite") && url.contains("m_home")) {
-            autoStep = 2;
-            autoTries = 0;
-            web.postDelayed(this::clickTeachingCategory, 700);
-        }
-    }
-
-    private void clickTeachingCategory() {
-        if (!autoBind || runCaptured || isFinishing()) return;
-        String js = "(function(){const t='教学学习';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|tab|menu|category/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
-        web.evaluateJavascript(js, v -> {
-            if (autoBind && !runCaptured && !isFinishing()) web.postDelayed(this::clickRunApp, 900);
-        });
-    }
-
-    private void clickRunApp() {
-        if (!autoBind || runCaptured || isFinishing()) return;
-        if (autoTries++ > 12) return;
-        String js = "(function(){const t='校园乐跑';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|card|app/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
-        web.evaluateJavascript(js, v -> {
-            if (!"true".equals(v) && autoBind && !runCaptured && !isFinishing()) {
-                if (autoTries > 0 && autoTries % 3 == 0) clickTeachingCategory();
-                else web.postDelayed(this::clickRunApp, 900);
-            }
-        });
-    }
-
-    private void captureRunUrl(String url) {
-        if (runCaptured || url == null) return;
-        if ((url.startsWith("https://tybzhtypt.neu.edu.cn/") || url.startsWith("http://tybzhtypt.neu.edu.cn/"))
-                && url.contains("token=") && url.contains("sign=")) {
-            try {
-                SecretStore.saveRunUrl(this, url);
-                runCaptured = true;
-                Toast.makeText(this, "已绑定校园乐跑", Toast.LENGTH_SHORT).show();
-                if (autoBind) finish();
-            } catch (Exception ignored) {}
-        }
     }
 
     private boolean handle(String url) {

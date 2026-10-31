@@ -154,12 +154,6 @@ public class Bridge {
             }
             case "campusRunUrl":
                 return "{\"url\":" + org.json.JSONObject.quote(act.getCampusRunUrl()) + "}";
-            case "saveCampusRunUrl":
-                act.saveCampusRunUrl(p.optString("url"));
-                return ok();
-            case "clearCampusRunUrl":
-                act.clearCampusRunUrl();
-                return ok();
             case "pickAttachments":
                 act.pickAttachments();
                 return ok();
@@ -187,9 +181,6 @@ public class Bridge {
                 return ok();
             case "openWeb":
                 act.openWeb(p.optString("url"), p.optString("title", "网页"), api.webViewCookies());
-                return ok();
-            case "openSsoWeb":
-                act.openSsoWeb(p.optString("url"), p.optString("title", "网页"), p.optBoolean("autoBind"));
                 return ok();
             case "autoBindRun":
                 act.startAutoBindRun();

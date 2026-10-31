@@ -174,10 +174,8 @@
       <div class="runpanel">
         <div class="runpanel-seal">跑</div>
         <h2>校园乐跑</h2>
-        <p class="runpanel-note">官方 H5 · 登录后自动续签，只在本机加密保存。</p>
+        <p class="runpanel-note">官方 H5 · 打开时自动准备登录链接，只保留跑步入口。</p>
         <button id="btnRunOpenTab" class="btn-primary" type="button">打开校园乐跑</button>
-        <button id="btnRunBindTab" class="btn-switch" type="button">从门户绑定 / 更换</button>
-        <p id="runTabState" class="runpanel-state"></p>
       </div>
     </section>
   </main>
@@ -249,19 +247,6 @@
     <p class="tabshint">关闭后不在底部 Tab 显示；至少保留一个。</p>
     <div id="tabsList"></div>
     <button id="tabsDone" class="btn-primary" type="button">完成</button>
-  </div>
-</div>
-
-<div id="runMask" class="sheetmask hidden">
-  <div class="sheet runsheet">
-    <div class="sheet-title">校园乐跑</div>
-    <p class="runhint">登录成功后会在后台自动完成一号通 → 应用中心 → 教学学习 → 校园乐跑绑定，不会弹出网页；也可以手动重新绑定或直接粘贴链接。</p>
-    <div class="field"><textarea id="runUrl" placeholder="https://tybzhtypt.neu.edu.cn/bdlp_h5_fitness_test/view/db/#/..."></textarea></div>
-    <button id="runPortal" class="btn-switch" type="button">从一号通进入绑定</button>
-    <button id="runOpen" class="btn-primary" type="button">打开乐跑</button>
-    <button id="runClear" class="btn-switch" type="button">清除本机链接</button>
-    <button id="runCancel" class="btn-switch" type="button">取消</button>
-    <p id="runMsg" class="msg"></p>
   </div>
 </div>
 
