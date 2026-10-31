@@ -418,7 +418,6 @@ function renderHeader(d) {
   $("#todayLabel").textContent = `${now.getFullYear()} / ${pad(now.getMonth() + 1)} / ${pad(now.getDate())} · ${wd}`;
   $("#greet").textContent = `${greeting()}，${p.name || "同学"}`;
   $("#who").textContent = [p.depart, p.xgh || p.username, p.role].filter(Boolean).join(" · ");
-  $("#btnImport").classList.toggle("hidden", !window.NEU);
   renderStats(state.tab, false);
 }
 
@@ -1559,7 +1558,6 @@ async function doLogout() {
 function closeSheet() { $("#sheetMask").classList.add("hidden"); }
 $("#btnMore").addEventListener("click", () => { updateCacheUsage(); $("#sheetMask").classList.remove("hidden"); });
 $("#sheetMask").addEventListener("click", (e) => { if (e.target === $("#sheetMask")) closeSheet(); });
-$("#linkJwxt").addEventListener("click", () => closeSheet());
 function getCampusRunUrl() {
   try {
     if (window.NEU && window.NEU.call) {
@@ -1641,32 +1639,12 @@ async function encryptedExport(kind) {
   toast(r.startsWith("ERR") ? r : "已加密导出：" + r);
 }
 
-function exportPlainCsvAll() {
-  if (!window.NEU) { toast("仅 Android 客户端支持"); return; }
-  const r = String(window.NEU.exportPlainCsvAll() || "");
-  toast(r.startsWith("ERR") ? r : "已导出明文：" + r);
-}
-
 $("#btnExportKb").addEventListener("click", () => encryptedExport("timetable"));
-$("#btnExport").addEventListener("click", () => { closeSheet(); encryptedExport("state"); });
-$("#btnImport").addEventListener("click", async () => {
+$("#btnClearCache").addEventListener("click", () => {
   closeSheet();
-  if (!window.NEU) return;
-  const pass = await askPassword("导入密码", "输入导出时设置的密码；旧版明文备份可留空。", true);
-  if (pass == null) return;
-  window.NEU.importState(pass);
+  if (window.NEU && window.NEU.call) window.NEU.call("clearWebCache", "{}");
+  else toast("仅 Android 客户端支持");
 });
-if (window.NEU) {
-  $("#fileBlock").classList.remove("hidden");
-  $("#btnOpenExports").addEventListener("click", () => {
-    closeSheet();
-    if (window.NEU.call) window.NEU.call("openExports", "{}");
-  });
-  $("#btnClearCache").addEventListener("click", () => {
-    closeSheet();
-    if (window.NEU.call) window.NEU.call("clearWebCache", "{}");
-  });
-}
 $("#btnRefresh").addEventListener("click", () => { closeSheet(); refresh(); });
 
 /* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */

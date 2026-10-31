@@ -383,7 +383,7 @@ public class MainActivity extends Activity {
     public void clearWebCache() {
         runOnUiThread(() -> {
             if (web != null) web.clearCache(true);
-            toast("已清理网页临时缓存");
+            toast("已清理网页资源缓存，登录和数据保留");
         });
     }
 
