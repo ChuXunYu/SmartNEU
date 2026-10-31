@@ -1153,3 +1153,54 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 
 #timeline.week-swiping .tg-course{box-shadow:none}
 .week-page{contain:layout paint;overflow:hidden}
+
+
+/* 校园卡：进入即聚焦二维码 */
+body.card-mode .masthead{padding:8px 18px 4px}
+body.card-mode #panel-card{
+  min-height:calc(100dvh - 150px);
+  display:flex;flex-direction:column;
+  padding-bottom:4px;
+}
+body.card-mode .cardwelcome{padding:4px 2px 6px}
+.cardwelcome-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cardwelcome .kicker{font-size:8px;letter-spacing:2px}
+.cardbadge{font-size:8px;letter-spacing:1px;color:var(--muted);
+  border:1px solid var(--line);padding:2px 6px;white-space:nowrap}
+.cardwelcome h1#greet{font-size:24px;line-height:1.2;letter-spacing:1px;margin:4px 0 3px}
+.cardwelcome .who{font-size:9px;letter-spacing:.8px}
+body.card-mode #panel-card .cardhero{
+  grid-template-columns:1fr auto;
+  padding:9px 14px;
+  margin:2px 0 4px;
+}
+body.card-mode #panel-card .cardwho b{font-size:14px}
+body.card-mode #panel-card .cardbal{margin-top:2px}
+body.card-mode #panel-card .cardbal b{font-size:34px}
+body.card-mode #panel-card .cardsub{margin-top:3px;font-size:8.5px}
+#panel-card .card-stage{
+  flex:1;min-height:0;padding:4px 0 2px;
+  display:flex;align-items:center;justify-content:center;
+}
+#panel-card .cardqr{
+  width:min(100%,330px);
+  padding:14px 16px 10px;
+  margin:0 auto;
+}
+#panel-card .cardqr #cardQr{width:210px;height:210px;margin:8px auto 5px}
+#panel-card .cardqr #cardQr svg{width:210px;height:210px}
+#panel-card .card-actions{margin-top:6px;gap:8px}
+#panel-card .card-note{margin:6px 0 0;line-height:1.5;text-align:center}
+#panel-card #updatedAt{
+  margin:4px 0 0;padding:0;min-height:0;
+  border:0;background:transparent;text-align:center;
+  font-size:8px;letter-spacing:.6px;
+}
+
+/* 校园卡：压缩顶部信息，让二维码在剩余空间居中 */
+body.card-mode #panel-card{height:calc(100dvh - 150px);min-height:0}
+body.card-mode #panel-card .cardhero{display:block;padding:8px 14px;margin:2px 0}
+body.card-mode #panel-card .cardhero .cardwho{display:none}
+body.card-mode #panel-card .cardhero .cardbal{margin-top:0}
+body.card-mode #panel-card .cardhero .cardsub{margin-top:2px}
+body.card-mode #panel-card .card-stage{flex:1 1 auto;min-height:0}

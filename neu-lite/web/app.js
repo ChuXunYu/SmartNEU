@@ -474,6 +474,7 @@ function statsFor(tab) {
 
 function renderStats(tab = state.tab, animate = true) {
   const led = $("#ledger");
+  if (!led) return;
   if (tab !== "card") { led.classList.add("hidden"); return; }
   led.classList.remove("hidden");
   const paint = () => {

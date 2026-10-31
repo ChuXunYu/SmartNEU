@@ -145,19 +145,12 @@
     <!-- 校园卡 -->
     <section id="panel-card" class="panel hidden">
       <div class="cardwelcome">
-        <div id="todayLabel" class="kicker">二〇二六年 十月</div>
+        <div class="cardwelcome-top">
+          <div id="todayLabel" class="kicker">二〇二六年 十月</div>
+          <span id="cardStatus" class="cardbadge">正常卡</span>
+        </div>
         <h1 id="greet">你好</h1>
         <div id="who" class="who"></div>
-      </div>
-      <div id="ledger" class="ledger hidden">
-        <div class="cell"><b id="st1">—</b><span id="sl1">今日课程</span></div>
-        <div class="cell"><b id="st2">—</b><span id="sl2">本周考试</span></div>
-        <div class="cell"><b id="st3">—</b><span id="sl3">距下考</span></div>
-      </div>
-      <div id="updatedAt" class="updated"></div>
-      <div class="section-head">
-        <h3><i>03</i>校园卡</h3>
-        <span id="cardStatus" class="sub"></span>
       </div>
       <div id="cardHero" class="cardhero"></div>
       <div class="card-stage">
@@ -167,7 +160,8 @@
         <button id="btnCardPay" class="btn-primary">充值</button>
         <button id="btnCardRefresh" class="btn-switch">刷新</button>
       </div>
-      <p class="card-note">余额来自校园卡，二维码为 e码通通行码，10 秒自动刷新。</p>
+      <p class="card-note">二维码为 e码通通行码，每 10 秒自动刷新。</p>
+      <div id="updatedAt" class="updated"></div>
     </section>
     <section id="panel-run" class="panel hidden">
       <div class="section-head"><h3><i>06</i>乐跑</h3></div>
