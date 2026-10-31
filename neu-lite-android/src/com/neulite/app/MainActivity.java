@@ -51,6 +51,7 @@ public class MainActivity extends Activity {
     private RunBinder runBinder;
     private final List<Uri> attachments = new ArrayList<>();
     private boolean backPending = false;
+    private boolean cardBright = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -530,6 +531,23 @@ public class MainActivity extends Activity {
                 toast("没有可用的浏览器");
             }
         });
+    }
+
+    /** 校园卡二维码页：临时把屏幕亮度拉满，离开页面/退到后台立即恢复。 */
+    public void setCardBrightness(boolean on) {
+        runOnUiThread(() -> {
+            cardBright = on;
+            if (web != null) web.setKeepScreenOn(on);
+            android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.screenBrightness = on ? 1.0f : -1.0f;
+            getWindow().setAttributes(lp);
+        });
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (cardBright) setCardBrightness(false);
     }
 
     @Override

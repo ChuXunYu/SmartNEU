@@ -1719,6 +1719,7 @@ let pendingQr = null;
 let cardLoading = false;
 let cardFetchedAt = 0;
 let cardWarmPromise = null;
+let cardRetry = 0;
 let mailLoading = false;
 let mailWebUrl = "";
 let mailDetailCurrentId = "";
@@ -1756,7 +1757,7 @@ function drawQr(code) {
     const g = qrcode(0, "M");
     g.addData(code);
     g.make();
-    box.innerHTML = g.createSvgTag({ cellSize: 4, margin: 0 });
+    box.innerHTML = g.createSvgTag({ cellSize: 4, margin: 4 });
     return true;
   } catch (e) {
     return false;
@@ -1847,6 +1848,11 @@ function renderCard(d, cached = false) {
   if (d.qr && d.qr.code) {
     ensureQrShell(d);
     applyQr(d.qr, d);
+    cardRetry = 0;
+  } else if (d.qr_error) {
+    ensureQrShell(d);
+    $("#cardQr").innerHTML = `<div class="qrfail">${esc(d.qr_error)}</div>`;
+    $("#qrValid").textContent = d.valid_until ? "虚拟卡有效期至 " + d.valid_until : "e码通虚拟卡";
   } else if (!document.querySelector("#cardQr svg")) {
     ensureQrShell(d);
     $("#cardQr").innerHTML = `<div class="qrloading"><i></i>正在获取通行码…</div>`;
@@ -1889,6 +1895,10 @@ async function loadCard(force = false) {
     saveCardCache(d);
     renderCard(d);
     if (d.status !== "ok") toast(d.qr_error || "校园卡部分数据读取失败");
+    if ((!d.qr || !d.qr.code) && state.tab === "card" && cardRetry < 2) {
+      cardRetry++;
+      setTimeout(() => { if (state.tab === "card") loadCard(true); }, 1800);
+    }
   } catch (e) {
     if (!cached) {
       $("#cardQrPanel").innerHTML = `<div class="qrlabel">校园码 · 通行</div><div class="qrfail">${esc(e.message || "读取失败")}</div>`;
@@ -2452,6 +2462,11 @@ function activateTab(name) {
   $$(".tab").forEach((b) => b.classList.toggle("active", b === btn));
   $$(".panel").forEach((p) => p.classList.add("hidden"));
   $(`#panel-${name}`).classList.remove("hidden");
+  try {
+    if (window.NEU && window.NEU.call) {
+      window.NEU.call("cardBrightness", JSON.stringify({ on: name === "card" }));
+    }
+  } catch {}
   renderStats(name, true);
   if (name === "card") loadCard();
   else stopQr();

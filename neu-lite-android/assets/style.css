@@ -1204,3 +1204,6 @@ body.card-mode #panel-card .cardhero .cardwho{display:none}
 body.card-mode #panel-card .cardhero .cardbal{margin-top:0}
 body.card-mode #panel-card .cardhero .cardsub{margin-top:2px}
 body.card-mode #panel-card .card-stage{flex:1 1 auto;min-height:0}
+
+#cardQr svg{shape-rendering:crispEdges;background:#fff}
+#cardQr{background:#fff}
