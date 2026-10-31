@@ -1633,21 +1633,21 @@ $("#passCancel").addEventListener("click", () => finishPass(null));
 $("#passMask").addEventListener("click", (e) => { if (e.target === $("#passMask")) finishPass(null); });
 $("#passInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#passOk").click(); });
 
-async function encryptedExport(kind) {
+function exportTimetableCsv() {
   if (!window.NEU) {
-    toast("桌面端导出为明文浏览器下载");
-    location.href = kind === "exams" ? "/api/export/exams.csv" : "/api/export/timetable.csv";
+    toast("正在下载课表 CSV");
+    location.href = "/api/export/timetable.csv";
     return;
   }
-  const pass = await askPassword("设置导出密码", "文件会用 AES-256 加密；密码只用于本次导出，不会保存。");
-  if (pass == null) return;
-  const r = String(kind === "state"
-    ? window.NEU.exportState(pass)
-    : window.NEU.exportEncrypted(kind, pass));
-  toast(r.startsWith("ERR") ? r : "已加密导出：" + r);
+  try {
+    const r = String(window.NEU.exportCsv("timetable") || "");
+    toast(r.startsWith("ERR") ? r : "已导出明文课表：" + r);
+  } catch (e) {
+    toast("导出失败：" + e.message);
+  }
 }
 
-$("#btnExportKb").addEventListener("click", () => encryptedExport("timetable"));
+$("#btnExportKb").addEventListener("click", exportTimetableCsv);
 $("#btnClearCache").addEventListener("click", () => {
   closeSheet();
   if (window.NEU && window.NEU.call) window.NEU.call("clearWebCache", "{}");
