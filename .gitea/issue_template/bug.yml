@@ -8,11 +8,12 @@ body:
     attributes:
       value: |
         请勿在 Issue 中粘贴学号、密码、TGT、Cookie、SMTP 专用密码或校园乐跑 token。
+        请先阅读 docs/TROUBLESHOOTING.md。
   - type: input
     id: version
     attributes:
       label: 版本
-      description: APK/提交号，例如 0.1.0 / f4a042d
+      description: APK 版本 / 提交号，例如 0.4.1 / 4a22aab
     validations:
       required: true
   - type: input

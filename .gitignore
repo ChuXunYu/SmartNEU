@@ -1,57 +1,66 @@
-# ==== 逆向/工具产物（不入库） ====
-_apk/
-_blutter_out/
-_jadx/
-_tools/
-artifacts/
-智慧东大.apk
-
-# ==== Python ====
-__pycache__/
-*.py[cod]
-neu-lite/build/
-neu-lite/dist/
-neu-lite/*.spec
-
-# ==== 本地状态 / 密钥（绝不入库） ====
+# ==== 本地状态 / 凭据（绝不入库） ====
 state.json
 probe.json
 probe_out/
-*.pem
-*.keystore
 _tgt*
 _wvcookie*
 _ipgwticket*
+*.keystore
+*.jks
+*.pem
+*.p12
+*.pfx
 
 # ==== Android 构建产物 ====
 neu-lite-android/build/
 neu-lite-android/test/out/
+neu-lite-android/*.apk
+neu-lite-android/*.idsig
+neu-lite-android/.gradle/
+neu-lite-android/local.properties
+*.apk
+*.aab
 *.idsig
 
-# ==== 临时文件 ====
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.neu-lite-venv/
+neu-lite/build/
+neu-lite/dist/
+neu-lite/*.spec
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==== 临时文件 / 截图 ====
 _*.py
 _*.txt
 _*.html
 _*.json
 _*.csv
 _*.png
+_*.jpg
 _*.sh
 final*.png
 .ws
-neu-lite/docs/_*.png
-
-# ==== 构建产物（仓库只保留一个稳定 APK） ====
-neu-lite-android/neu-lite.apk
-*.exe
-*.spec
-
-# ==== IDE / OS ====
-.venv/
-.idea/
-.vscode/
-Thumbs.db
-.DS_Store
 *.log
 
-# APK 只发布到 Release，不进入源码仓库
-*.apk
+# ==== 工具 / 逆向产物 ====
+_apk/
+_blutter_out/
+_jadx/
+_tools/
+artifacts/
+智慧东大.apk
+*.exe
+
+# ==== IDE / OS ====
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store

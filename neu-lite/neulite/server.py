@@ -48,7 +48,7 @@ class Ctx:
             "imei": (self.st.imei[:8] + "…") if self.st.imei else "",
             "remember": bool(remember),
             "saved_user": remember.get("username", ""),
-        "password_saved": False,
+            "password_saved": False,
             "saved_name": remember.get("name", "") or profile.get("name", ""),
             "saved_xgh": remember.get("xgh", "") or profile.get("xgh", ""),
             "updated_at": self.st.updated_at,

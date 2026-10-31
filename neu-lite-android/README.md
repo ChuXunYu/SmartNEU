@@ -8,21 +8,26 @@
 adb install -r 日在NEU.apk
 ```
 
-或从 [Releases](https://git.aizhangz.shop/aizhangz/SmartNEU/releases) 下载 APK 后传到手机点击安装（允许“安装未知来源应用”）。
+或从 [Releases](https://git.aizhangz.shop/aizhangz/SmartNEU/releases) 下载 APK 后传到手机安装（需允许“安装未知来源应用”）。
 
-- 包名：`com.neulite.app`
-- 版本：`0.4.0`（versionCode 20）
-- minSdk 24 / targetSdk 34
-- 签名：自签名 `CN=neu-lite, C=CN`；升级需使用同一签名
+| 项 | 值 |
+| --- | --- |
+| 包名 | `com.neulite.app` |
+| 版本 | `0.4.1`（versionCode 22） |
+| 最低系统 | Android 7.0（API 24） |
+| 目标 SDK | 34 |
+| 签名 | 自签名 `CN=neu-lite, C=CN` |
+
+升级必须使用同一签名。
 
 ## 功能
 
 - 课表、考试、成绩、网费、校园卡、邮箱；
-- 校园卡 e码通二维码，10 秒刷新；
+- 校园卡 e码通二维码，自动刷新；
 - 邮箱未读/已读分组、正文缓存、写信和附件；
 - 可选的校园乐跑 H5 Tab；
 - 底部 Tab 可在「更多 → 界面显示」中单独开关；
-- 首页缓存优先，导出文件默认加密。
+- 缓存优先渲染；导出文件每类只保留最新一份。
 
 ## 构建
 
@@ -35,7 +40,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File build.ps1
 依赖：
 
 - JDK 11+
-- Android SDK：`build-tools`、`platforms/android-36`
+- Android SDK：`build-tools;36.0.0`、`platforms;android-36`
 - PowerShell 7
 - 7-Zip
 
@@ -45,33 +50,52 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File build.ps1
 日在NEU.apk
 ```
 
-本地 APK 不提交到源码仓库；发布时使用：
+`build.ps1` 顶部的 `$sdk` 需要改成自己的 Android SDK 路径。
+
+APK 不提交到源码仓库，发布时使用：
 
 ```powershell
-pwsh ..\scripts
-elease.ps1
+pwsh ..\scripts\release.ps1
 ```
-
-`build.ps1` 内的 SDK 路径需要按本机环境调整。
 
 ## 权限
 
-应用会按需申请：
+按需申请：
 
-- 定位：校园乐跑 H5 / 校园服务；
-- 相机：校园乐跑人脸相关页面；
-- 文件选择：网页上传附件；
-- 网络与通知：基础运行。
+| 权限 | 用途 |
+| --- | --- |
+| 网络 / 网络状态 | 基础运行 |
+| 定位 | 校园乐跑 H5 / 校园服务 |
+| 相机 | 乐跑人脸相关页面 |
+| 文件选择 | 网页上传附件 |
+| 通知 | 后台任务提示 |
 
-权限只在对应页面触发时申请，不申请后台定位和麦克风。
+不申请后台定位、麦克风、通讯录、短信读取。
 
 ## 数据与安全
 
 - 登录凭据只保存在应用私有目录，`allowBackup=false`；
-- SMTP 专用密码、校园乐跑链接使用 Android Keystore 加密；
-- 导出的状态备份与 CSV 默认密码加密；
+- SMTP 专用密码、校园乐跑链接使用 Android Keystore AES-GCM；
+- 课表导出为明文 CSV，请自行保管；
 - 仓库不包含账号密码、Cookie 或访问令牌；
 - 不要把自己的凭据或二维码截图发到 Issue。
+
+## 代码结构
+
+```text
+src/com/neulite/app/
+├─ MainActivity.java    单 Activity + WebView
+├─ Bridge.java          JS ↔ Java 桥
+├─ Api.java             学校接口与会话
+├─ RunBinder.java       乐跑自动绑定
+├─ RunUrl.java          乐跑 token/sign 续签
+├─ SecretStore.java     Keystore 加密存储
+├─ CryptoBox.java       导出文件加解密
+├─ PaymentActivity.java 支付 WebView
+└─ SmtpClient.java      原生 SMTP
+```
+
+详细说明见 [架构文档](../docs/ARCHITECTURE.md)。
 
 ## 限制
 

@@ -46,7 +46,7 @@ def cmd_login(args):
     print("登录成功:", json.dumps(res.get("profile"), ensure_ascii=False))
     print("状态已保存:", config.STATE_FILE)
     print("设备指纹 imei:", st.imei)
-    print("提示：把 state.json 复制到新设备即可免二次验证。")
+    print("提示：桌面端不保存密码明文；换设备请重新登录。")
 
 
 def cmd_check(args):

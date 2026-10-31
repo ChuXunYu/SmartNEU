@@ -1,12 +1,17 @@
 # Changelog
 
-本项目从 2026-10 开始整理为公开源码仓库。版本号沿用 APK 的 `0.1.x`。
+本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
 ## v0.4.1 - 2026-10-31
 
 ### 修复
 
-- 提升 versionCode，允许从测试版 0.5.0 直接覆盖安装，无需卸载。
+- 提升 versionCode，允许从测试版覆盖安装，无需卸载。
+
+### 文档
+
+- 仓库整理为规范开源结构：补充架构、开发、故障排查、隐私文档；
+- 更新构建与发布说明。
 
 ## v0.4.0 - 2026-10-31
 

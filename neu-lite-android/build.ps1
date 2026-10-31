@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$sdk = 'D:\Scoop\apps\android-clt\current'
+$sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { 'D:\Scoop\apps\android-clt\current' }
+if (-not (Test-Path (Join-Path $sdk 'platforms\android-36\android.jar'))) {
+    throw "找不到 Android SDK 或 android-36：$sdk。请设置 ANDROID_HOME。"
+}
 $bt = Join-Path $sdk 'build-tools\36.0.0'
 $androidJar = Join-Path $sdk 'platforms\android-36\android.jar'
 $build = Join-Path $root 'build'
@@ -37,7 +40,7 @@ if ($LASTEXITCODE -ne 0) { throw 'd8 failed' }
 Write-Host '== add classes.dex =='
 Copy-Item (Join-Path $build 'dex\classes.dex') (Join-Path $build 'classes.dex') -Force
 Push-Location $build
-& 'D:\Scoop\shims\7z.exe' a -tzip (Join-Path $build 'base.apk') classes.dex | Out-Null
+& '7z.exe' a -tzip (Join-Path $build 'base.apk') classes.dex | Out-Null
 Pop-Location
 if ($LASTEXITCODE -ne 0) { throw 'add dex failed' }
 
