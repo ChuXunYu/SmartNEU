@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(this, api), "NEU");
         setContentView(web);
         trimWebCacheIfNeeded();
+        compactExports();
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -281,9 +282,49 @@ public class MainActivity extends Activity {
      * Android 10+  下载/neu-lite/{课表|考试|备份}/名称-时间.csv|json
      * Android 9-   应用专属外部目录/exports/...
      */
+    /** 启动时把旧版本按时间累积的导出文件压缩为每类最新一份。 */
+    private void compactExports() {
+        new Thread(() -> {
+            for (String folder : new String[]{"课表", "考试", "备份"}) {
+                compactExports(folder);
+            }
+        }, "export-compact").start();
+    }
+
+    private void compactExports(String folder) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            String path = Environment.DIRECTORY_DOWNLOADS + "/neu-lite/" + folder + "%";
+            String[] proj = {MediaStore.Downloads._ID, MediaStore.Downloads.DATE_ADDED};
+            List<long[]> rows = new ArrayList<>();
+            try (Cursor c = getContentResolver().query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    proj, MediaStore.Downloads.RELATIVE_PATH + " LIKE ?", new String[]{path},
+                    MediaStore.Downloads.DATE_ADDED + " DESC")) {
+                if (c != null) {
+                    while (c.moveToNext()) rows.add(new long[]{c.getLong(0), c.getLong(1)});
+                }
+            } catch (Exception ignored) {}
+            // 保留最新一份，其余删除。
+            for (int i = 1; i < rows.size(); i++) {
+                try {
+                    getContentResolver().delete(ContentUris.withAppendedId(
+                            MediaStore.Downloads.EXTERNAL_CONTENT_URI, rows.get(i)[0]), null, null);
+                } catch (Exception ignored) {}
+            }
+        } else {
+            File dir = new File(getExternalFilesDir(null), "exports/" + folder);
+            File[] files = dir.listFiles();
+            if (files == null || files.length <= 1) return;
+            List<File> list = new ArrayList<>();
+            for (File f : files) list.add(f);
+            list.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+            for (int i = 1; i < list.size(); i++) list.get(i).delete();
+        }
+    }
+
     private String writeDownload(String folder, String base, String ext, String mime, byte[] data) throws Exception {
-        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date());
-        String name = base + "-" + stamp + "." + ext;
+        // 同一用途只保留最新一份文件，导出新数据时直接替换旧文件。
+        String name = base + "." + ext;
+        clearExports(folder);
         if (Build.VERSION.SDK_INT >= 29) {
             ContentValues v = new ContentValues();
             v.put(MediaStore.Downloads.DISPLAY_NAME, name);
@@ -300,7 +341,6 @@ public class MainActivity extends Activity {
             ContentValues done = new ContentValues();
             done.put(MediaStore.Downloads.IS_PENDING, 0);
             getContentResolver().update(uri, done, null, null);
-            pruneExports(folder, base, 30);
             return "下载/neu-lite/" + folder + "/" + name;
         }
         File dir = new File(getExternalFilesDir(null), "exports/" + folder);
@@ -309,45 +349,21 @@ public class MainActivity extends Activity {
         try (FileOutputStream fos = new FileOutputStream(f)) {
             fos.write(data);
         }
-        pruneExports(folder, base, 30);
         return f.getAbsolutePath();
     }
 
-    /** 每个用途最多保留最近 30 份导出，避免长期累积。 */
-    private void pruneExports(String folder, String base, int keep) {
+    /** 覆盖某一用途的旧导出文件，避免按日期无限堆积。 */
+    private void clearExports(String folder) {
         if (Build.VERSION.SDK_INT >= 29) {
             String path = Environment.DIRECTORY_DOWNLOADS + "/neu-lite/" + folder + "%";
-            String[] proj = {MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME,
-                    MediaStore.Downloads.DATE_ADDED};
-            List<long[]> rows = new ArrayList<>();
-            try (Cursor c = getContentResolver().query(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    proj, MediaStore.Downloads.RELATIVE_PATH + " LIKE ?", new String[]{path},
-                    MediaStore.Downloads.DATE_ADDED + " DESC")) {
-                if (c != null) {
-                    while (c.moveToNext()) {
-                        String name = c.getString(1);
-                        if (name != null && name.startsWith(base)) {
-                            rows.add(new long[]{c.getLong(0), c.getLong(2)});
-                        }
-                    }
-                }
-            }
-            if (rows.size() <= keep) return;
-            rows.sort(Comparator.comparingLong(a -> a[1]));
-            int remove = rows.size() - keep;
-            for (int i = 0; i < remove; i++) {
-                Uri u = ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, rows.get(i)[0]);
-                getContentResolver().delete(u, null, null);
-            }
+            try {
+                getContentResolver().delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        MediaStore.Downloads.RELATIVE_PATH + " LIKE ?", new String[]{path});
+            } catch (Exception ignored) {}
         } else {
             File dir = new File(getExternalFilesDir(null), "exports/" + folder);
             File[] files = dir.listFiles();
-            if (files == null) return;
-            List<File> list = new ArrayList<>();
-            for (File f : files) if (f.getName().startsWith(base)) list.add(f);
-            if (list.size() <= keep) return;
-            list.sort(Comparator.comparingLong(File::lastModified));
-            for (int i = 0; i < list.size() - keep; i++) list.get(i).delete();
+            if (files != null) for (File f : files) f.delete();
         }
     }
 

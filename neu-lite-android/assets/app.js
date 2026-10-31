@@ -128,6 +128,14 @@ let refreshing = false;
 let refreshGuard = null;
 let refreshId = 0;
 
+// 清理旧版本遗留的独立缓存键，只保留当前单一数据源。
+function cleanupLegacyStorage() {
+  ["neu.overview", "neu.overview.v1", "neu.mail.details", "neu.run.url"].forEach((k) => {
+    try { localStorage.removeItem(k); } catch {}
+  });
+}
+cleanupLegacyStorage();
+
 function withTimeout(promise, ms, message) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
