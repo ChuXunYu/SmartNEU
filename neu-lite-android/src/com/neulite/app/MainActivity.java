@@ -5,6 +5,8 @@ import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.ClipData;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -52,6 +54,12 @@ public class MainActivity extends Activity {
     private final List<Uri> attachments = new ArrayList<>();
     private boolean backPending = false;
     private boolean cardBright = false;
+    private volatile String runBindState = "idle";
+    private volatile String runBindError = "";
+    private volatile boolean runBindVpn = false;
+    private volatile long runBindStartedAt = 0;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private volatile boolean destroying = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,6 +101,7 @@ public class MainActivity extends Activity {
             web.postDelayed(() -> web.evaluateJavascript(
                     "window.refresh&&window.refresh()", null), 2500);
         }
+        registerRunNetworkCallback();
     }
 
     @Override
@@ -474,16 +483,63 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------ 免登跳转
-    /** 登录成功后调用；全程无可见界面，成功后加密保存乐跑链接。 */
+    /** 登录成功后调用；先直连，失败后自动尝试 WebVPN。 */
     public void startAutoBindRun() {
-        runOnUiThread(() -> {
-            if (runBinder != null) return;
-            runBinder = new RunBinder(this, api, ok -> {
-                runBinder = null;
-                if (ok) toast("校园乐跑已自动绑定");
-            });
-            runBinder.start();
-        });
+        runOnUiThread(() -> beginAutoBind(false));
+    }
+
+    private void beginAutoBind(boolean vpn) {
+        if (runBinder != null) return;
+        runBindState = "running";
+        runBindVpn = vpn;
+        runBindError = "";
+        if (runBindStartedAt == 0) runBindStartedAt = System.currentTimeMillis();
+        runBinder = new RunBinder(this, api, vpn, (ok, error) -> runOnUiThread(() -> {
+            if (destroying) return;
+            runBinder = null;
+            if (ok) {
+                runBindState = "ok";
+                runBindError = "";
+                toast("校园乐跑已自动绑定");
+            } else if (!vpn) {
+                // 直连失败（校外/移动数据/门户不可达），自动切 WebVPN 再试一次。
+                runBindState = "running";
+                runBindError = "";
+                beginAutoBind(true);
+            } else {
+                runBindState = "failed";
+                runBindError = error == null || error.isEmpty() ? "校园乐跑准备失败" : error;
+                toast(runBindError);
+            }
+        }));
+        runBinder.start();
+    }
+
+    public JSONObject runBindStatus() {
+        JSONObject o = new JSONObject();
+        Api.put(o, "state", runBindState);
+        Api.put(o, "error", runBindError);
+        Api.put(o, "vpn", runBindVpn);
+        Api.put(o, "elapsed", runBindStartedAt == 0 ? 0 : System.currentTimeMillis() - runBindStartedAt);
+        Api.put(o, "has_url", !getCampusRunUrl().isEmpty());
+        return o;
+    }
+
+    private void registerRunNetworkCallback() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm == null) return;
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    if (!api.sessionInfo().optBoolean("logged_in")) return;
+                    if (!getCampusRunUrl().isEmpty()) return;
+                    if ("running".equals(runBindState)) return;
+                    runOnUiThread(() -> startAutoBindRun());
+                }
+            };
+            cm.registerDefaultNetworkCallback(networkCallback);
+        } catch (Exception ignored) {}
     }
 
     public void openPay(String url, List<String[]> cookies) {
@@ -568,9 +624,17 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        destroying = true;
         if (runBinder != null) {
             runBinder.cancel();
             runBinder = null;
+        }
+        if (networkCallback != null) {
+            try {
+                ((ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE))
+                        .unregisterNetworkCallback(networkCallback);
+            } catch (Exception ignored) {}
+            networkCallback = null;
         }
         super.onDestroy();
     }

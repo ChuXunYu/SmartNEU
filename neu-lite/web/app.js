@@ -1582,18 +1582,61 @@ function directRunUrl(url) {
 }
 
 let runBindAt = 0;
+let runBindPoll = 0;
+
+function getRunBindStatus() {
+  try {
+    if (window.NEU && window.NEU.call) {
+      return JSON.parse(window.NEU.call("runBindStatus", "{}") || "{}");
+    }
+  } catch {}
+  return {};
+}
+
 function ensureRunBind() {
   if (!(window.NEU && window.NEU.call)) return;
-  if (Date.now() - runBindAt < 8000) return;
+  if (Date.now() - runBindAt < 6000) return;
   runBindAt = Date.now();
   try { window.NEU.call("autoBindRun", "{}"); } catch {}
+}
+
+function pollRunBind() {
+  if (runBindPoll) return;
+  const deadline = Date.now() + 100000;
+  const tick = () => {
+    const url = getCampusRunUrl();
+    if (url) {
+      clearTimeout(runBindPoll);
+      runBindPoll = 0;
+      openCampusRun();
+      return;
+    }
+    const st = getRunBindStatus();
+    if (st.state === "failed") {
+      clearTimeout(runBindPoll);
+      runBindPoll = 0;
+      toast(st.error || "校园乐跑准备失败，请连接校园网或 WebVPN 后重试");
+      return;
+    }
+    if (Date.now() > deadline) {
+      clearTimeout(runBindPoll);
+      runBindPoll = 0;
+      toast("校园乐跑准备超时，请连接校园网或 WebVPN 后再试");
+      return;
+    }
+    runBindPoll = setTimeout(tick, 700);
+  };
+  tick();
 }
 
 function openCampusRun() {
   const url = getCampusRunUrl();
   if (!url) {
+    const st = getRunBindStatus();
+    if (st.state === "failed") runBindAt = 0;
     ensureRunBind();
-    toast("正在准备校园乐跑，请稍后再试");
+    toast("正在准备校园乐跑，请稍候…");
+    pollRunBind();
     return;
   }
   openUrlSafe(directRunUrl(url), "校园乐跑");

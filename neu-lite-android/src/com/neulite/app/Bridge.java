@@ -188,6 +188,8 @@ public class Bridge {
             case "autoBindRun":
                 act.startAutoBindRun();
                 return ok();
+            case "runBindStatus":
+                return act.runBindStatus().toString();
             case "schedule": {
                 String start = p.optString("start", "");
                 return api.schedule(start.isEmpty() ? null : start).toString();
