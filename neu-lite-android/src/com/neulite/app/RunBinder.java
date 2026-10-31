@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceError;
@@ -39,6 +40,7 @@ final class RunBinder {
     private String portalUrl = PORTAL;
     private String appCenterUrl = APP_CENTER;
     private final int timeoutMs;
+    private final java.util.List<WebView> popups = new java.util.ArrayList<>();
 
     RunBinder(Context ctx, Api api, boolean vpnOnly, Callback callback) {
         this.ctx = ctx;
@@ -86,6 +88,7 @@ final class RunBinder {
             s.setDatabaseEnabled(true);
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             s.setJavaScriptCanOpenWindowsAutomatically(true);
+            s.setSupportMultipleWindows(true);
             CookieManager cm = CookieManager.getInstance();
             cm.setAcceptCookie(true);
             // 清空/首次登录后，隐藏 WebView 的 CookieStore 是空的；把 Api 的会话 Cookie 注入。
@@ -136,6 +139,29 @@ final class RunBinder {
             });
             web.setWebChromeClient(new WebChromeClient() {
                 @Override
+                public boolean onCreateWindow(WebView view, boolean isDialog,
+                                             boolean isUserGesture, Message resultMsg) {
+                    try {
+                        WebView popup = new WebView(ctx);
+                        WebSettings ps = popup.getSettings();
+                        ps.setJavaScriptEnabled(true);
+                        ps.setDomStorageEnabled(true);
+                        ps.setDatabaseEnabled(true);
+                        ps.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                        popup.setWebViewClient(web.getWebViewClient());
+                        popup.setWebChromeClient(web.getWebChromeClient());
+                        popups.add(popup);
+                        WebView.WebViewTransport transport =
+                                (WebView.WebViewTransport) resultMsg.obj;
+                        transport.setWebView(popup);
+                        resultMsg.sendToTarget();
+                        return true;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }
+
+                @Override
                 public void onReceivedTitle(WebView view, String title) {
                     inspect(view.getUrl());
                 }
@@ -183,7 +209,7 @@ final class RunBinder {
 
     private void clickClass() {
         if (done) return;
-        String js = "(function(){const t='教学学习';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|tab|menu|category/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
+        String js = "(function(){const t='教学学习';const docs=[document];for(const f of document.querySelectorAll('iframe')){try{const d=f.contentDocument;if(d)docs.push(d);}catch(e){}}const ns=docs.flatMap(d=>Array.from(d.querySelectorAll('*'))).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|tab|menu|category/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
         eval(js, v -> ui.postDelayed(this::clickRun, 1100));
     }
 
@@ -193,7 +219,7 @@ final class RunBinder {
             finish(false, "门户中未找到校园乐跑入口");
             return;
         }
-        String js = "(function(){const t='校园乐跑';const ns=Array.from(document.querySelectorAll('*')).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|card|app/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
+        String js = "(function(){const t='校园乐跑';const docs=[document];for(const f of document.querySelectorAll('iframe')){try{const d=f.contentDocument;if(d)docs.push(d);}catch(e){}}const ns=docs.flatMap(d=>Array.from(d.querySelectorAll('*'))).filter(e=>e.children.length===0&&e.textContent.trim()===t);for(const el of ns){let n=el;for(let i=0;i<6&&n;i++){if(n.tagName==='A'||n.onclick||n.getAttribute('onclick')||n.getAttribute('role')==='button'||(n.className&&/item|card|app/i.test(String(n.className)))){try{n.scrollIntoView({block:'center'});}catch(e){}n.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}n=n.parentElement;}try{el.scrollIntoView({block:'center'});}catch(e){}el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}return false;})()";
         eval(js, v -> {
             if (done) return;
             if (!"true".equals(v)) {
@@ -225,6 +251,10 @@ final class RunBinder {
         done = true;
         ui.removeCallbacksAndMessages(null);
         try {
+            for (WebView p : popups) {
+                try { p.stopLoading(); p.destroy(); } catch (Exception ignored) {}
+            }
+            popups.clear();
             if (web != null) {
                 web.stopLoading();
                 web.destroy();
