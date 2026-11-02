@@ -212,28 +212,24 @@ class Jwxt:
     def _sunday_of(d: dt.date) -> dt.date:
         return d - dt.timedelta(days=(d.weekday() + 1) % 7)
 
-    def _term_first_monday(self) -> tuple[dt.date, int]:
-        """第 1 教学周的周一（教务数据里周一=1 … 周日=7）。"""
+    def _term_first_sunday(self) -> tuple[dt.date, int]:
+        """第 1 教学周的周日（教务周次按周日—周六计）。"""
         info = self.current_term()
         week = info.get("week") or 1
-        today = dt.date.today()
-        this_monday = today - dt.timedelta(days=today.weekday())
-        first = this_monday - dt.timedelta(days=(week - 1) * 7)
+        this_sunday = self._sunday_of(dt.date.today())
+        first = this_sunday - dt.timedelta(days=(week - 1) * 7)
         return first, week
 
     def week_events(self, start: dt.date | None = None) -> dict:
-        """以周日为第一天展示；每个日期按它所属的教学周取课。"""
-        first_monday, cur_week = self._term_first_monday()
-        today = dt.date.today()
-        anchor = start or self._sunday_of(today)
-        anchor = self._sunday_of(anchor)
+        """以周日为第一天展示；周日也属于新的一周，不能归到前一个周一。"""
+        first_sunday, cur_week = self._term_first_sunday()
+        anchor = self._sunday_of(start or dt.date.today())
         days = [anchor + dt.timedelta(days=i) for i in range(7)]  # 周日..周六
         data = self.timetable()
         events = []
         for idx, d in enumerate(days):
             col_day = 7 if idx == 0 else idx      # 周日=7，周一=1 … 周六=6
-            monday = d - dt.timedelta(days=d.weekday())
-            week_no = (monday - first_monday).days // 7 + 1
+            week_no = (self._sunday_of(d) - first_sunday).days // 7 + 1
             for c in data["courses"]:
                 if not c["arranged"] or c["day"] != col_day:
                     continue
@@ -252,7 +248,7 @@ class Jwxt:
                     "color": c["color"],
                 })
         events.sort(key=lambda e: (e["start"], e["title"]))
-        label_week = ((days[1] - first_monday).days // 7) + 1  # 用周一所在周做标题
+        label_week = ((anchor - first_sunday).days // 7) + 1
         return {"start": anchor.isoformat(), "end": (anchor + dt.timedelta(days=6)).isoformat(),
                 "week": label_week, "current_week": cur_week, "events": events,
                 "courses": data["courses"]}

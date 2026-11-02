@@ -2211,6 +2211,10 @@ public class Api {
         Calendar cal = parseDate(start);
         int dow = cal.get(Calendar.DAY_OF_WEEK); // 周日=1
         cal.add(Calendar.DAY_OF_MONTH, -(dow - 1));
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
         return cal;
     }
 
@@ -2228,7 +2232,7 @@ public class Api {
     JSONObject weekEvents(String start) throws Exception {
         JSONObject term = currentTerm();
         int cur = term.optInt("week", 1);
-        Calendar first = mondayOfDate(parseDate(null));
+        Calendar first = sundayOf(null);
         first.add(Calendar.DAY_OF_MONTH, -(cur - 1) * 7);
         Calendar anchor = sundayOf(start);
         JSONObject tt = jwTimetable(str(term, "term"));
@@ -2239,8 +2243,8 @@ public class Api {
                 Calendar d = (Calendar) anchor.clone();
                 d.add(Calendar.DAY_OF_MONTH, i);
                 int colDay = (i == 0) ? 7 : i; // 周日=7，周一=1 … 周六=6
-                Calendar dMon = mondayOfDate(d);
-                int weekNo = (int) ((dMon.getTimeInMillis() - first.getTimeInMillis()) / 86400000L / 7) + 1;
+                Calendar dSun = sundayOf(fmtDate(d));
+                int weekNo = (int) ((dSun.getTimeInMillis() - first.getTimeInMillis()) / 86400000L / 7) + 1;
                 for (int j = 0; j < courses.length(); j++) {
                     JSONObject c = courses.optJSONObject(j);
                     if (c == null || !c.optBoolean("arranged")) continue;
@@ -2271,8 +2275,7 @@ public class Api {
         for (JSONObject e : evs) events.put(e);
         Calendar endCal = (Calendar) anchor.clone();
         endCal.add(Calendar.DAY_OF_MONTH, 6);
-        Calendar labelMon = mondayOfDate(parseDate(fmtDate(endCal)));
-        int labelWeek = (int) ((labelMon.getTimeInMillis() - first.getTimeInMillis()) / 86400000L / 7) + 1;
+        int labelWeek = (int) ((anchor.getTimeInMillis() - first.getTimeInMillis()) / 86400000L / 7) + 1;
         JSONObject out = new JSONObject();
         put(out, "start", fmtDate(anchor));
         put(out, "end", fmtDate(endCal));

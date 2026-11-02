@@ -123,14 +123,14 @@ async function nativeApi(path, opts = {}) {
 const api = window.NEU ? nativeApi : httpApi;
 
 /* ---------------- 启动与缓存 ---------------- */
-const CACHE_KEY = "neu.overview.v2";
+const CACHE_KEY = "neu.overview.v3";
 let refreshing = false;
 let refreshGuard = null;
 let refreshId = 0;
 
 // 清理旧版本遗留的独立缓存键，只保留当前单一数据源。
 function cleanupLegacyStorage() {
-  ["neu.overview", "neu.overview.v1", "neu.mail.details", "neu.run.url"].forEach((k) => {
+  ["neu.overview", "neu.overview.v1", "neu.overview.v2", "neu.mail.details", "neu.run.url"].forEach((k) => {
     try { localStorage.removeItem(k); } catch {}
   });
 }
@@ -888,13 +888,13 @@ function computeWeek(anchor) {
   const start = sundayOf(anchor);
   const baseWeek = Number(base.week || 1);
   const baseStart = new Date((base.start || ymd(sundayOf(new Date()))) + "T00:00:00");
-  const first = addDays(mondayOf(addDays(baseStart, 1)), -(baseWeek - 1) * 7);
+  const first = addDays(sundayOf(baseStart), -(baseWeek - 1) * 7);
   const days = [];
   for (let i = 0; i < 7; i++) days.push(addDays(start, i));
   const events = [];
   days.forEach((d, i) => {
     const colDay = i === 0 ? 7 : i;
-    const weekNo = Math.round((mondayOf(d) - first) / 86400000 / 7) + 1;
+    const weekNo = Math.round((sundayOf(d) - first) / 86400000 / 7) + 1;
     for (const c of courses) {
       if (!c.arranged || c.day !== colDay) continue;
       if (!Array.isArray(c.weeks) || !c.weeks.includes(weekNo)) continue;
@@ -912,7 +912,7 @@ function computeWeek(anchor) {
     }
   });
   events.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
-  const week = Math.round((mondayOf(days[1]) - first) / 86400000 / 7) + 1;
+  const week = Math.round((start - first) / 86400000 / 7) + 1;
   return { start: ymd(start), end: ymd(addDays(start, 6)), week,
            current_week: cur, events, courses };
 }

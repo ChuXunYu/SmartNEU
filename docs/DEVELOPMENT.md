@@ -148,9 +148,10 @@ release:  版本发布
 ```powershell
 cd neu-lite
 python run.py selftest
+python -m unittest discover -s tests -v
 ```
 
-覆盖 RSA 信封、考试/成绩归一化、状态文件读取。
+`selftest` 覆盖 RSA 信封、考试/成绩归一化、状态文件读取；`tests/` 包含课表周次边界回归测试。
 
 ### Android 协议自测
 

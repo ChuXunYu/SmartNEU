@@ -43,6 +43,12 @@ python run.py serve --open
 | `probe` | 探测教务端点与数据 |
 | `selftest` | 离线自检（RSA 信封、记录归一化、状态读取） |
 
+测试：
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
 ## 功能
 
 - 课表、考试、成绩、网费、校园卡、邮箱；
