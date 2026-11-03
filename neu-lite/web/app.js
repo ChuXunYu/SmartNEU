@@ -1208,15 +1208,15 @@ function renderExams(exams) {
 
   let html = "";
   if (upcoming.length) {
-    html += `<div class="examgroup">
-      <div class="examgroup-head"><h4>待考</h4><span>${upcoming.length} 场</span></div>
+    html += `<details class="examgroup upcominggroup" open>
+      <summary><span>待考</span><i>${upcoming.length} 场</i><b>收起</b></summary>
       <div class="examlist">${upcoming.map((x) => card(x, false)).join("")}</div>
-    </div>`;
+    </details>`;
   } else {
-    html += `<div class="examgroup">
-      <div class="examgroup-head"><h4>待考</h4><span>0 场</span></div>
+    html += `<details class="examgroup upcominggroup" open>
+      <summary><span>待考</span><i>0 场</i><b>收起</b></summary>
       <div class="examnone">暂无待考</div>
-    </div>`;
+    </details>`;
   }
   if (past.length) {
     html += `<details class="examgroup pastgroup">
