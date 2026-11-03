@@ -2,6 +2,12 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
+## v0.4.6 - 2026-11-03
+
+### 修复
+
+- 暗色模式下右上角「邮箱」按钮改为深色底、浅色字，不再显示刺眼的浅色块。
+
 ## v0.4.5 - 2026-11-03
 
 ### 变更

@@ -1211,3 +1211,9 @@ body.card-mode #panel-card .card-stage{flex:1 1 auto;min-height:0}
 @media (prefers-color-scheme: dark){
   .tg-course b{color:#17120d}
 }
+/* 暗色模式下右上角邮箱按钮跟随深色，而不是反白的浅色块 */
+@media (prefers-color-scheme: dark){
+  .mailbtn{background:var(--paper-2);border-color:var(--line);color:var(--ink)}
+  .mailbtn .mtxt{color:var(--muted)}
+  .mailbtn:hover{background:var(--red-deep);border-color:var(--red-deep);color:var(--paper)}
+}
