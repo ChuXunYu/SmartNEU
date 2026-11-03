@@ -37,14 +37,14 @@ neu-lite/*.spec
 .ruff_cache/
 
 # ==== 临时文件 / 截图 ====
-_*.py
-_*.txt
-_*.html
-_*.json
-_*.csv
-_*.png
-_*.jpg
-_*.sh
+/_*.py
+/_*.txt
+/_*.html
+/_*.json
+/_*.csv
+/_*.png
+/_*.jpg
+/_*.sh
 final*.png
 .ws
 *.log
@@ -64,3 +64,5 @@ artifacts/
 *.iml
 Thumbs.db
 .DS_Store
+
+!**/__init__.py
