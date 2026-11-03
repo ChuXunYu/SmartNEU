@@ -2,6 +2,13 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
+## v0.4.4 - 2026-11-03
+
+### 变更
+
+- 考试页「已结束」分组默认收起；
+- 放大「展开 / 收起」按钮的字号、内边距和点击区域。
+
 ## v0.4.3 - 2026-11-03
 
 ### 修复

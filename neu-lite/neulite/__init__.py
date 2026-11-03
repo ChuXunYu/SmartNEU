@@ -12,4 +12,4 @@
 版本号与 Android APK 保持一致，见仓库根目录 CHANGELOG.md。
 """
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"

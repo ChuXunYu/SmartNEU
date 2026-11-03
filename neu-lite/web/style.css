@@ -854,12 +854,12 @@ body.card-mode #panel-card .section-head{margin:10px 0 8px}
 .exam.past .datebox b{color:var(--muted)}
 .examnone{font-size:10px;color:var(--muted);letter-spacing:.5px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
 .pastgroup{margin-top:18px;border-top:1px solid var(--line);padding-top:0}
-.pastgroup summary{list-style:none;display:flex;align-items:baseline;gap:8px;padding:13px 0 9px;cursor:pointer;user-select:none}
+.pastgroup summary{list-style:none;display:flex;align-items:center;gap:9px;padding:16px 0 13px;cursor:pointer;user-select:none;min-height:44px}
 .pastgroup summary::-webkit-details-marker{display:none}
-.pastgroup summary span{font-family:var(--serif);font-size:12px;font-weight:600;letter-spacing:2px}
-.pastgroup summary i{font-style:normal;font-size:8px;color:var(--muted);letter-spacing:1px}
+.pastgroup summary span{font-family:var(--serif);font-size:13px;font-weight:600;letter-spacing:2px}
+.pastgroup summary i{font-style:normal;font-size:9px;color:var(--muted);letter-spacing:1px}
 .pastgroup summary b{font-weight:400;font-size:0;margin-left:auto;color:var(--red)}
-.pastgroup summary b::after{content:"展开";font-size:8px;letter-spacing:1px}
+.pastgroup summary b::after{content:"展开";display:inline-block;font-size:11px;line-height:1.2;letter-spacing:1.2px;padding:6px 12px;border:1px solid var(--line);background:var(--paper2);color:var(--red)}
 .pastgroup[open] summary b::after{content:"收起"}
 .pastgroup .exam{opacity:.62}
 

@@ -1219,7 +1219,7 @@ function renderExams(exams) {
     </div>`;
   }
   if (past.length) {
-    html += `<details class="examgroup pastgroup" ${upcoming.length ? "" : "open"}>
+    html += `<details class="examgroup pastgroup">
       <summary><span>已结束</span><i>${past.length} 场</i><b>展开</b></summary>
       <div class="examlist">${past.map((x) => card(x, true)).join("")}</div>
     </details>`;
