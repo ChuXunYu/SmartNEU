@@ -1207,3 +1207,7 @@ body.card-mode #panel-card .card-stage{flex:1 1 auto;min-height:0}
 
 #cardQr svg{shape-rendering:crispEdges;background:#fff}
 #cardQr{background:#fff}
+/* 暗色模式下课程块仍是浅色系，课程名固定用深色，避免白字刺眼 */
+@media (prefers-color-scheme: dark){
+  .tg-course b{color:#17120d}
+}

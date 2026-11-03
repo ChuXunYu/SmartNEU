@@ -2,6 +2,12 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
+## v0.4.3 - 2026-11-03
+
+### 修复
+
+- 暗色模式下周课表课程名改用深色，避免浅色课程块上的白字在暗环境中刺眼。
+
 ## v0.4.2 - 2026-11-02
 
 ### 修复
