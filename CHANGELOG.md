@@ -2,6 +2,13 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
+## v0.4.7 - 2026-11-05
+
+### 变更
+
+- 平均绩点 GPA 直接显示教务系统原始值，不再四舍五入到两位小数；
+- 根据原始值长度自适应字号，较长 GPA 不会被挤出卡片。
+
 ## v0.4.6 - 2026-11-03
 
 ### 修复

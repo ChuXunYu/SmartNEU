@@ -1254,12 +1254,13 @@ function renderGrades(grades) {
   if (!grades) { hero.innerHTML = ""; list.innerHTML = `<div class="empty">暂无成绩</div>`; return; }
   const r = grades.rank || {};
   const items = grades.items || [];
-  const gpa = parseFloat(r.gpa);
+  const gpaRaw = String(r.gpa == null ? "" : r.gpa).trim();
+  const gpaCls = gpaRaw.length >= 8 ? "gpa-xs" : gpaRaw.length >= 6 ? "gpa-sm" : "";
   const major = rankText(r.major_rank || r.rank);
   const overall = r.rank && r.rank !== r.major_rank ? rankText(r.rank) : "";
 
   hero.innerHTML = `<div class="gpahero">
-    <div class="gpa-num"><b>${isNaN(gpa) ? "—" : gpa.toFixed(2)}</b><span>平均绩点 GPA</span></div>
+    <div class="gpa-num"><b class="${gpaCls}">${gpaRaw ? esc(gpaRaw) : "—"}</b><span>平均绩点 GPA</span></div>
     <div class="gpa-meta">
       <h4>${r.major_rank ? "专业排名" : "排名"}</h4>
       <div class="rank">${major}</div>
