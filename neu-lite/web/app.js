@@ -291,6 +291,8 @@ async function refresh() {
       d.mail = prevMail;
       d.mail_unread = prevMail.portal_unread ?? prevMail.unread;
     }
+    // 刷新后同样落在今天所在周，并默认选中今天
+    normalizeScheduleToToday(d);
     renderAll(d);
     renderStats(state.tab, false);
     saveCache(d);
@@ -366,7 +368,9 @@ async function boot() {
 
   const cache = loadCache();
   if (cache) {
-    // 秒开：先用上次成功刷新的数据渲染，不发起网络请求
+    // 秒开：先用上次成功刷新的数据渲染，不发起网络请求；
+    // 若缓存停在别的教学周，先本地切回今天所在周，避免开机显示旧周。
+    normalizeScheduleToToday(cache.data);
     state.data = cache.data;
     state.mailDetails = cache.data.mail_details || {};
     pruneMailDetails(cache.data.mail && cache.data.mail.items);
@@ -915,6 +919,33 @@ function computeWeek(anchor) {
   const week = Math.round((start - first) / 86400000 / 7) + 1;
   return { start: ymd(start), end: ymd(addDays(start, 6)), week,
            current_week: cur, events, courses };
+}
+
+// 打开软件/刷新后把课表锚定到“今天所在周”，避免直接显示上次刷新时的旧周。
+function normalizeScheduleToToday(data) {
+  const s = data && data.schedule;
+  if (!s || s.error) return;
+  const today = ymd(new Date());
+  const start = s.start || "";
+  const end = s.end || "";
+  const containsToday = !!(start && end && today >= start && today <= end);
+  if (containsToday) {
+    // 已经是今天所在周：只把选中日切回今天
+    const idx = Math.round((new Date(today + "T00:00:00") - new Date(start + "T00:00:00")) / 86400000);
+    state.selectedDay = idx >= 0 && idx < 7 ? idx : null;
+    return;
+  }
+  // 缓存里是别的周：用整学期课表在本地推算出今天所在周
+  state.schedule = s;
+  const local = computeWeek(new Date());
+  if (local) {
+    data.schedule = local;
+    state.schedule = local;
+    const idx = Math.round((new Date(today + "T00:00:00") - new Date(local.start + "T00:00:00")) / 86400000);
+    state.selectedDay = idx >= 0 && idx < 7 ? idx : null;
+  } else {
+    state.selectedDay = null;
+  }
 }
 
 let weekBusy = false;
