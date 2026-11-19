@@ -374,6 +374,14 @@ async function loadIpwg() {
 let silentLoading = false;
 let sessionExpiredShown = false;
 
+// 缓存有效期：超过 3 天视为过期，开机自动更新一次。
+const CACHE_MAX_AGE_MS = 3 * 86400000;
+function isCacheStale(at) {
+  const ts = Number(at);
+  if (!ts || !isFinite(ts)) return true;
+  return Date.now() - ts > CACHE_MAX_AGE_MS;
+}
+
 function showSessionExpired() {
   if (sessionExpiredShown) return;
   sessionExpiredShown = true;
@@ -413,7 +421,9 @@ async function boot() {
     setUpdated(cache.at);
     setTimeout(warmCard, 500);
     setTimeout(restoreComposeDraft, 900);
-    setTimeout(validateSessionInBackground, 600);
+    // 数据超过 3 天没更新，开机后台自动拉一次；先显示缓存，不阻塞启动。
+    if (isCacheStale(cache.at)) setTimeout(() => { refresh(); }, 1200);
+    else setTimeout(validateSessionInBackground, 600);
     return;
   }
   // 首次安装：先用本地资料占位，再拉一次
