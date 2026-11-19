@@ -13,7 +13,7 @@ adb install -r 日在NEU.apk
 | 项 | 值 |
 | --- | --- |
 | 包名 | `com.neulite.app` |
-| 版本 | `0.4.9`（versionCode 30） |
+| 版本 | `0.4.10`（versionCode 31） |
 | 最低系统 | Android 7.0（API 24） |
 | 目标 SDK | 34 |
 | 签名 | 自签名 `CN=neu-lite, C=CN` |

@@ -2,6 +2,13 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
+## v0.4.10 - 2026-11-19
+
+### 修复
+
+- 修复 Android 11 等旧版 WebView（Chromium 87 以下）中「更多」「邮箱」等弹层不显示的问题：`inset` 简写改为 top/right/bottom/left 逐边声明；
+- 差异卡片高度补 `100vh` 兜底，旧版 WebView 同样可用。
+
 ## v0.4.9 - 2026-11-19
 
 ### 新增

@@ -45,7 +45,7 @@ body{
   text-rendering:optimizeLegibility;
 }
 body::before{
-  content:"";position:fixed;inset:0;z-index:100;pointer-events:none;opacity:.55;
+  content:"";position:fixed;top:0;right:0;bottom:0;left:0;z-index:100;pointer-events:none;opacity:.55;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
   mix-blend-mode:multiply;
 }
@@ -70,7 +70,7 @@ h1,h2,h3,p{margin:0}
 .seal-lg{width:52px;height:52px;font-size:30px;margin-bottom:20px}
 
 /* ---------------- 登录 ---------------- */
-.loginview{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:var(--paper);overflow:auto}
+.loginview{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:grid;place-items:center;padding:24px;background:var(--paper);overflow:auto}
 .loginbox{width:min(100%,380px);border:1px solid var(--line);background:var(--paper);padding:34px 28px 26px;position:relative}
 .loginbox::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--red)}
 .loginbox h1{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:4px;margin:0 0 6px}
@@ -331,7 +331,7 @@ main{padding:0 18px 24px}
 .tab.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:16px;height:2px;background:var(--red)}
 
 /* ---------------- 更多面板 ---------------- */
-.sheetmask{position:fixed;inset:0;z-index:70;background:rgba(28,25,22,.42);display:flex;align-items:flex-end;justify-content:center}
+.sheetmask{position:fixed;top:0;right:0;bottom:0;left:0;z-index:70;background:rgba(28,25,22,.42);display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:min(100%,640px);background:var(--paper);border-top:2px solid var(--ink);padding:20px 20px calc(18px + env(safe-area-inset-bottom));
   animation:up .22s ease both}
 @keyframes up{from{transform:translateY(16px);opacity:.4}to{transform:none;opacity:1}}
@@ -626,7 +626,7 @@ main{padding:0 22px 30px;flex:1;display:flex;flex-direction:column}
 .card-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
 .card-actions .btn-primary{margin:0}
 .card-note{font-size:9px;letter-spacing:.5px;color:var(--muted);margin-top:14px;line-height:1.9}
-.mailview{position:fixed;inset:0;z-index:64;background:var(--paper);overflow:auto;
+.mailview{position:fixed;top:0;right:0;bottom:0;left:0;z-index:64;background:var(--paper);overflow:auto;
   padding:0 22px calc(28px + env(safe-area-inset-bottom))}
 .mailhead{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
   gap:12px;padding:16px 0 12px;background:var(--paper);border-bottom:1px solid var(--line)}
@@ -675,7 +675,7 @@ body.card-mode .hello{display:none}
 body.card-mode .masthead{padding-bottom:8px}
 body.card-mode .app{padding-bottom:82px}
 body.card-mode main{padding-bottom:0}
-body.card-mode #panel-card{display:flex;flex-direction:column;min-height:calc(100dvh - 176px)}
+body.card-mode #panel-card{display:flex;flex-direction:column;min-height:calc(100vh - 176px);min-height:calc(100dvh - 176px)}
 body.card-mode #panel-card::after{display:none}
 body.card-mode #panel-card .section-head{margin:14px 0 10px}
 #panel-card .card-stage{flex:1;min-height:250px;display:flex;align-items:center;justify-content:center;padding:14px 0}
@@ -1001,7 +1001,7 @@ body.roomy-top #panel-schedule .examup{margin-top:10px}
 .tabrow small{display:block;font-size:8px;color:var(--muted);letter-spacing:.3px;margin-top:2px}
 .switch{position:relative;width:38px;height:20px;flex:0 0 38px;display:block;cursor:pointer}
 .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;z-index:2;cursor:pointer}
-.switch i{position:absolute;inset:0;border:1px solid var(--line);background:var(--paper);transition:.18s}
+.switch i{position:absolute;top:0;right:0;bottom:0;left:0;border:1px solid var(--line);background:var(--paper);transition:.18s}
 .switch i::after{content:"";position:absolute;width:14px;height:14px;left:3px;top:2px;background:var(--muted);transition:.18s}
 .switch input:checked + i{background:var(--ink);border-color:var(--ink)}
 .switch input:checked + i::after{transform:translateX(18px);background:var(--paper)}
@@ -1109,7 +1109,7 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 #panel-schedule .timetable{width:100%;margin-left:auto;margin-right:auto}
 #panel-exams .exam-center{width:100%;max-width:620px;margin:auto;display:flex;flex-direction:column}
 #panel-exams .examlist{width:100%;max-width:620px;margin:0 auto}
-#panel-exams{min-height:calc(100dvh - 150px);display:flex;flex-direction:column}
+#panel-exams{min-height:calc(100vh - 150px);min-height:calc(100dvh - 150px);display:flex;flex-direction:column}
 
 
 #timeline.swipe-left{animation:swipeLeft .24s ease both}
@@ -1162,7 +1162,7 @@ body.roomy-top main{padding-left:10px;padding-right:10px}
 /* 校园卡：进入即聚焦二维码 */
 body.card-mode .masthead{padding:8px 18px 4px}
 body.card-mode #panel-card{
-  min-height:calc(100dvh - 150px);
+  min-height:calc(100vh - 150px);min-height:calc(100dvh - 150px);
   display:flex;flex-direction:column;
   padding-bottom:4px;
 }
@@ -1202,7 +1202,7 @@ body.card-mode #panel-card .cardsub{margin-top:3px;font-size:8.5px}
 }
 
 /* 校园卡：压缩顶部信息，让二维码在剩余空间居中 */
-body.card-mode #panel-card{height:calc(100dvh - 150px);min-height:0}
+body.card-mode #panel-card{height:calc(100vh - 150px);height:calc(100dvh - 150px);min-height:0}
 body.card-mode #panel-card .cardhero{display:block;padding:8px 14px;margin:2px 0}
 body.card-mode #panel-card .cardhero .cardwho{display:none}
 body.card-mode #panel-card .cardhero .cardbal{margin-top:0}
@@ -1223,7 +1223,7 @@ body.card-mode #panel-card .card-stage{flex:1 1 auto;min-height:0}
 }
 
 /* 刷新后的差异卡片 */
-.diffsheet{max-height:calc(100dvh - 16px);overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+.diffsheet{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
 .diffhint{font-size:9.5px;letter-spacing:.4px;color:var(--muted);margin:0 0 14px;line-height:1.7}
 .diffbody{display:flex;flex-direction:column;gap:16px;margin-bottom:16px}
 .diffsec{display:flex;flex-direction:column}
