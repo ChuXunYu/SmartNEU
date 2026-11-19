@@ -62,7 +62,7 @@ neu-lite-android/assets/
 修改后必须同步：
 
 ```powershell
-Copy-Item neu-lite\web\app.js,neu-lite\web\index.html,neu-lite\web\style.css neu-lite-android\assets -Force
+Copy-Item neu-lite\web\app.js,neu-lite\web\index.html,neu-lite\web\style.css,neu-lite\web\diff.js neu-lite-android\assets -Force
 ```
 
 `qrcode.js` 是第三方库，通常不需要改；若升级，两个目录都要更新。
@@ -152,6 +152,13 @@ python -m unittest discover -s tests -v
 ```
 
 `selftest` 覆盖 RSA 信封、考试/成绩归一化、状态文件读取；`tests/` 包含课表周次边界回归测试。
+
+刷新差异卡片的前端逻辑在 `neu-lite/web/diff.js`，可用 Node 直接测试：
+
+```powershell
+cd neu-lite
+node tests/diff.test.js
+```
 
 ### Android 协议自测
 

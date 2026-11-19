@@ -27,7 +27,7 @@
 3. 修改 Web UI 时同步两个目录：
 
    ```powershell
-   Copy-Item neu-lite\web\app.js,neu-lite\web\index.html,neu-lite\web\style.css neu-lite-android\assets -Force
+   Copy-Item neu-lite\web\app.js,neu-lite\web\index.html,neu-lite\web\style.css,neu-lite\web\diff.js neu-lite-android\assets -Force
    ```
 
 4. 修改 Java 后至少构建一次：
@@ -42,6 +42,7 @@
    ```powershell
    cd neu-lite
    python run.py selftest
+   node tests/diff.test.js
    ```
 
 6. 不要提交 APK、exe、`state.json`、keystore、token、构建缓存或个人截图；

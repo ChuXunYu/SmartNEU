@@ -1221,3 +1221,22 @@ body.card-mode #panel-card .card-stage{flex:1 1 auto;min-height:0}
   .mailbtn .mtxt{color:var(--muted)}
   .mailbtn:hover{background:var(--red-deep);border-color:var(--red-deep);color:var(--paper)}
 }
+
+/* 刷新后的差异卡片 */
+.diffsheet{max-height:calc(100dvh - 16px);overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+.diffhint{font-size:9.5px;letter-spacing:.4px;color:var(--muted);margin:0 0 14px;line-height:1.7}
+.diffbody{display:flex;flex-direction:column;gap:16px;margin-bottom:16px}
+.diffsec{display:flex;flex-direction:column}
+.diffhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.diffhead h4{margin:0;font-family:var(--serif);font-size:12.5px;letter-spacing:2px;font-weight:600}
+.diffhead span{font-size:8.5px;letter-spacing:.5px;color:var(--muted)}
+.diffrow{display:grid;grid-template-columns:48px 1fr;gap:3px 10px;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.diffrow i{font-style:normal;font-size:8.5px;line-height:1.9;letter-spacing:.6px;color:var(--muted);grid-row:span 2}
+.diffrow.add i{color:var(--celadon)}
+.diffrow.del i{color:var(--red)}
+.diffrow.mod i{color:var(--gold)}
+.diffrow.key i{color:var(--red)}
+.diffrow b{font-family:var(--serif);font-size:12.5px;font-weight:600;letter-spacing:.3px;line-height:1.5;word-break:break-all}
+.diffrow span{font-size:9px;line-height:1.7;color:var(--muted);letter-spacing:.3px;word-break:break-all;grid-column:2}
+.diffrow .diffmeta{color:var(--ink-2)}
+.diffmore{margin:8px 0 0;font-size:8.5px;color:var(--muted);letter-spacing:.4px}

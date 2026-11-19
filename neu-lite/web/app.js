@@ -248,6 +248,35 @@ function renderAll(d) {
   if (d.session?.imei) $("#imei").textContent = `设备 ${d.session.imei}`;
 }
 
+/** 对比刷新前后的课表与成绩；没有变化或缺少旧数据时返回 null。 */
+function buildDataDiff(prev, next) {
+  const D = window.NEUDiff;
+  if (!D || !prev || !next) return null;
+  const out = {};
+  if (prev.schedule && next.schedule) {
+    out.schedule = D.schedule(prev.schedule.courses, next.schedule.courses);
+  }
+  if (prev.grades && next.grades) {
+    out.grades = D.grades(prev.grades, next.grades);
+  }
+  return D.isEmpty(out) ? null : out;
+}
+
+function showDataDiff(diff) {
+  const D = window.NEUDiff;
+  if (!D || !diff) return;
+  const body = $("#diffBody");
+  if (!body) return;
+  const html = D.render(diff, esc);
+  if (!html) return;
+  body.innerHTML = html;
+  $("#diffMask").classList.remove("hidden");
+}
+
+function closeDataDiff() {
+  $("#diffMask").classList.add("hidden");
+}
+
 let refreshStartedAt = 0;
 function startRefresh() {
   refreshStartedAt = performance.now();
@@ -278,10 +307,12 @@ function finishRefresh(ok) {
   chip.classList.add("hidden");
 }
 
-async function refresh() {
+async function refresh(options = {}) {
   if (refreshing) return;
   refreshing = true;
   const myId = ++refreshId;
+  // 卡片只在“已有数据 + 用户主动刷新”时出现；首次获取不弹。
+  const prevData = state.data;
   startRefresh();
   try {
     const d = await withTimeout(api("/api/overview"), 20000, "更新超时（20 秒）");
@@ -291,10 +322,12 @@ async function refresh() {
       d.mail = prevMail;
       d.mail_unread = prevMail.portal_unread ?? prevMail.unread;
     }
+    const diff = options.notifyDiff ? buildDataDiff(prevData, d) : null;
     // 刷新后同样落在今天所在周，并默认选中今天
     normalizeScheduleToToday(d);
     renderAll(d);
     renderStats(state.tab, false);
+    if (diff) showDataDiff(diff);
     saveCache(d);
     setUpdated(Date.now());
     finishRefresh(true);
@@ -1728,7 +1761,9 @@ $("#btnClearCache").addEventListener("click", () => {
   if (window.NEU && window.NEU.call) window.NEU.call("clearWebCache", "{}");
   else toast("仅 Android 客户端支持");
 });
-$("#btnRefresh").addEventListener("click", () => { closeSheet(); refresh(); });
+$("#btnRefresh").addEventListener("click", () => { closeSheet(); refresh({ notifyDiff: true }); });
+$("#diffClose").addEventListener("click", closeDataDiff);
+$("#diffMask").addEventListener("click", (e) => { if (e.target === $("#diffMask")) closeDataDiff(); });
 
 /* ---------------- 校园卡 / 邮箱 / 支付 ---------------- */
 function openUrlSafe(url, title = "邮箱") {

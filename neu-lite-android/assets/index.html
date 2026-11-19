@@ -284,8 +284,18 @@
 <div id="progress" class="progress hidden"><i></i></div>
 <div id="updateChip" class="updatechip hidden"><span class="spin"></span><span id="updateText">正在更新…</span></div>
 
+<div id="diffMask" class="sheetmask hidden">
+  <div class="sheet diffsheet">
+    <div class="sheet-title">数据有更新</div>
+    <p class="diffhint">与上次数据相比，检测到以下变化</p>
+    <div id="diffBody" class="diffbody"></div>
+    <button id="diffClose" class="btn-primary" type="button">知道了</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 <script src="qrcode.js"></script>
+<script src="diff.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

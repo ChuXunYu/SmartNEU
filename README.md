@@ -10,7 +10,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Android" src="https://img.shields.io/badge/Android-7.0%2B-3ddc84.svg">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776ab.svg">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.4.8-c0392b.svg">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.4.9-c0392b.svg">
 </p>
 
 **日在NEU** 是一个非官方、个人维护的东北大学校园信息客户端。它把常用的校园服务收敛到一个界面里：课表、考试、成绩、网费、校园卡、邮箱，以及可选的校园乐跑入口。Android 端是原生壳 + WebView，桌面端是 Python 本地服务 + 同一套 Web UI。
@@ -129,7 +129,7 @@ pwsh .\scripts\release.ps1
 SmartNEU/
 ├─ neu-lite/                    # Python 桌面端 + Web UI
 │  ├─ neulite/                  # 校园服务客户端与本地 HTTP 服务
-│  ├─ web/                      # 前端页面（与 Android assets 保持同步）
+│  ├─ web/                      # 前端页面（含 diff.js，与 Android assets 保持同步）
 │  ├─ docs/                     # 截图
 │  ├─ run.py                    # CLI 入口
 │  └─ requirements.txt

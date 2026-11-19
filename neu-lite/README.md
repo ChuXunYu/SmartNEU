@@ -47,6 +47,7 @@ python run.py serve --open
 
 ```powershell
 python -m unittest discover -s tests -v
+node tests/diff.test.js
 ```
 
 ## 功能
@@ -72,7 +73,7 @@ neu-lite/
 │  ├─ exports.py   # CSV
 │  ├─ mock.py      # 演示数据
 │  └─ server.py    # 本地 HTTP 服务
-├─ web/            # 页面、样式、二维码库
+├─ web/            # 页面、样式、二维码库、刷新差异计算 diff.js
 ├─ docs/           # 截图
 ├─ run.py          # CLI 入口
 └─ requirements.txt
