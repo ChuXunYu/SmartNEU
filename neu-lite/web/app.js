@@ -1449,7 +1449,7 @@ function renderNetPlan(net, usage) {
     <div class="tiertable">${rows}</div>
     <p class="plan-note">${source ? source + "<br>" : ""}仅对 IPv4 下行流量计费；IPv6、校内资源、IPv4 上行免费。
       每日 0:00–6:00 外网流量免费；一个账号最多 5 台设备同时在线。
-      依据《东北大学学生上网资费政策》，实际账单以 ipgw 为准。</p>
+      依据学校学生上网资费政策，实际账单以 ipgw 为准。</p>
   </div>`;
 
   let current = usage;

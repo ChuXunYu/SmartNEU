@@ -1,6 +1,6 @@
 # 日在NEU
 
-> 东北大学校园信息聚合客户端：课表、考试、成绩、网费、校园卡、邮箱与校园乐跑入口。
+> 校园信息聚合客户端：课表、考试、成绩、网费、校园卡、邮箱与校园乐跑入口。
 
 <p align="center">
   <img src="icon.jpg" width="140" alt="日在NEU 图标">
@@ -10,12 +10,14 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Android" src="https://img.shields.io/badge/Android-7.0%2B-3ddc84.svg">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776ab.svg">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.4.11-c0392b.svg">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.4.12-c0392b.svg">
 </p>
 
-**日在NEU** 是一个非官方、个人维护的东北大学校园信息客户端。它把常用的校园服务收敛到一个界面里：课表、考试、成绩、网费、校园卡、邮箱，以及可选的校园乐跑入口。Android 端是原生壳 + WebView，桌面端是 Python 本地服务 + 同一套 Web UI。
+**日在NEU** 是一个非官方、个人维护的校园信息客户端，适配「XX大学」的教务与统一身份认证体系。它把日常要用的校园服务收敛到一个界面：课表、考试、成绩、网费、校园卡、邮箱，以及可选的校园乐跑入口。
 
-> 本项目与东北大学官方无关。仅用于访问**自己的**校园账号数据。请遵守学校网络与信息系统使用规则，不要用于代跑、伪造轨迹、绕过风控或获取他人数据。
+Android 端是原生壳 + WebView，桌面端是 Python 本地服务 + 同一套 Web UI，两端共享缓存与交互逻辑。项目只做只读聚合和必要的账号操作，不依赖任何私有接口文档，也不追求功能堆砌。
+
+> 本项目与 XX大学 官方无关，仅用于访问**自己的**校园账号数据。请遵守所在学校的网络与信息系统使用规则，不要用于代跑、伪造轨迹、绕过风控或获取他人数据。
 
 ## 功能
 
@@ -49,8 +51,9 @@
 
 ## 下载与安装
 
-- 最新 APK：[Releases](https://git.aizhangz.shop/aizhangz/SmartNEU/releases)
-- 镜像仓库：<https://github.com/ChuXunYu/SmartNEU>
+- 最新 APK：[GitHub Releases](https://github.com/ChuXunYu/SmartNEU/releases/latest)
+- 主仓库：<https://github.com/ChuXunYu/SmartNEU>
+- 镜像仓库：<https://git.aizhangz.shop/aizhangz/SmartNEU>
 - 包名：`com.neulite.app`
 - 最低系统：Android 7.0（API 24）
 - 目标 SDK：34
@@ -109,17 +112,33 @@ APK 不进入源码仓库，只作为 Release 资产分发。
 
 ## 发布
 
-发布脚本会构建 APK、创建 `v<version>` 标签、推送 `main` 与标签、在 Forgejo 创建 Release 并上传 APK 和 SHA-256。
+APK 不进入源码仓库，作为 Release 资产分发。发布前必须：
+
+1. 更新 `neu-lite-android/AndroidManifest.xml` 的 `versionName` / `versionCode`；
+2. 在 `CHANGELOG.md` 增加同版本小节；
+3. 提交并推送后保证工作区干净。
+
+### GitHub Releases（主发布渠道）
+
+```powershell
+cd neu-lite-android
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+cd ..
+git tag v0.4.12
+git push github main --tags
+gh release create v0.4.12 neu-lite-android/日在NEU.apk `
+  --repo ChuXunYu/SmartNEU `
+  --title "日在NEU v0.4.12" `
+  --notes-file CHANGELOG.md
+```
+
+### Forgejo（镜像渠道）
+
+`scripts/release.ps1` 会构建 APK、创建标签、推送 `main` 与标签，并在 Forgejo 创建 Release 上传 APK。
 
 ```powershell
 pwsh .\scripts\release.ps1
 ```
-
-发布前必须：
-
-1. 更新 `neu-lite-android/AndroidManifest.xml` 的 `versionName` / `versionCode`；
-2. 在 `CHANGELOG.md` 增加同版本小节；
-3. 提交后保证工作区干净。
 
 需要环境变量 `FORGEJO_TOKEN`，或事先让 Git Credential Manager 保存 Forgejo 凭据。
 

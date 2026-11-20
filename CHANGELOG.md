@@ -2,6 +2,13 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的结构，版本号与 `neu-lite-android/AndroidManifest.xml` 保持一致。
 
+## v0.4.12 - 2026-11-21
+
+### 变更
+
+- README 重写项目描述，发布渠道调整为 GitHub Releases；
+- 仓库文档与界面文案不再出现学校全称，统一以「XX大学」或「学校」代称。
+
 ## v0.4.11 - 2026-11-19
 
 ### 新增

@@ -165,7 +165,7 @@ final class SmtpClient {
         X509Certificate cert = (X509Certificate) chain[0];
         cert.checkValidity();
         if (hasDnsName(cert, host)) return;
-        // 东北大学邮件由 Coremail 云托管，mails.neu.edu.cn 的证书 SAN 为 *.icoremail.net
+        // 学校邮件由 Coremail 云托管，mails.neu.edu.cn 的证书 SAN 为 *.icoremail.net
         if ("mails.neu.edu.cn".equalsIgnoreCase(host)
                 && (hasDnsName(cert, "*.icoremail.net") || hasDnsName(cert, "icoremail.net"))) return;
         throw new Exception("SMTP TLS 证书主机名不匹配: " + host);
